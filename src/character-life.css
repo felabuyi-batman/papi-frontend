@@ -18,8 +18,9 @@
   aspect-ratio: 1;
 }
 
+/* Idle bob + talk jaw are driven in AnimatedCharacterArt (matches pip_talking-3.html). */
 .character-life.character-life--pip-rig.is-floating {
-  animation: pip-rig-float 3.2s ease-in-out infinite;
+  animation: none;
 }
 
 .character-life__rig {
@@ -28,19 +29,25 @@
   width: 100%;
   height: 100%;
   transform-origin: 50% 90%;
+  will-change: transform;
 }
 
-.world-pip .character-life__rig {
-  transform: scale(1.28);
+/* Scale the wrapper, not the animated rig — JS owns rig transform every frame */
+.world-pip .character-life--pip-rig {
+  transform: scale(1.04);
+  transform-origin: 50% 90%;
 }
 
-.world-pip .character-life.character-life--pip-rig.is-floating {
-  animation-name: pip-rig-float-hero;
-}
-
-@keyframes pip-rig-float-hero {
-  0%, 100% { transform: translateY(0) rotate(-.35deg) scale(1); }
-  50% { transform: translateY(-5px) rotate(.35deg) scale(1.008, .992); }
+.character-life__rig-shadow {
+  position: absolute;
+  z-index: 0;
+  left: 50%;
+  bottom: 7%;
+  width: 40%;
+  height: 4%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  background: radial-gradient(ellipse, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0) 70%);
 }
 
 .character-life__rig-body,
@@ -63,51 +70,40 @@
   pointer-events: none;
 }
 
+/* Lid open/close is driven by SVG attributes in AnimatedCharacterArt (pip_talking-3.html).
+   Do not force opacity/transform here — that made blinks invisible. */
 .character-life__rig-lid {
-  opacity: 0;
-  transform: scaleY(0);
-}
-
-.character-life__rig-lids.is-blinking .character-life__rig-lid {
   opacity: 1;
-  animation: pip-rig-blink 150ms ease-in-out;
 }
 
-.character-life__rig-lid--left {
-  transform-origin: 426px 326px;
-}
-
-.character-life__rig-lid--right {
-  transform-origin: 596px 325px;
-}
-
+/* Exact tile placement from pip_talking-3.html layout(450,442,120,76 / 450,503,120,71) */
 .character-life--pip-rig .character-life__rig-beak {
   position: absolute;
   z-index: 3;
-  left: 43.945%;
+  left: 43.945% !important;
   display: block;
-  width: 11.719%;
-  object-fit: contain;
+  width: 11.719% !important;
+  max-width: 11.719% !important;
+  height: auto !important;
+  object-fit: fill;
   pointer-events: none;
 }
 
 .character-life--pip-rig .character-life__rig-beak--upper {
-  top: 43.164%;
-  height: 7.422%;
+  top: 43.164% !important;
+  height: 7.422% !important;
 }
 
 .character-life--pip-rig .character-life__rig-beak--lower {
-  top: 49.121%;
-  height: 6.934%;
+  top: 49.121% !important;
+  height: 6.934% !important;
   transform-origin: 50% 0;
+  will-change: transform;
 }
 
-.character-life--pip-rig.is-talking .character-life__rig {
-  animation: pip-rig-speaking .4s ease-in-out infinite alternate;
-}
-
+.character-life--pip-rig.is-talking .character-life__rig,
 .character-life--pip-rig.is-talking .character-life__rig-beak--lower {
-  animation: pip-rig-jaw .24s ease-in-out infinite alternate;
+  animation: none;
 }
 
 .character-life.is-floating {
@@ -251,44 +247,12 @@
 .character-life__wing i:nth-child(3) { --feather-index: 2; width: 74%; }
 
 .world-pip__hit .character-life__art,
-.pip-character .character-life__art {
-  animation: none;
-}
-
+.pip-character .character-life__art,
 .world-pip__hit .character-life__rig-body,
 .world-pip__hit .character-life__rig-beak,
 .pip-character .character-life__rig-body,
 .pip-character .character-life__rig-beak {
-  animation: none;
-}
-
-@keyframes pip-rig-blink {
-  0%, 100% { transform: scaleY(0); }
-  50% { transform: scaleY(1); }
-}
-
-@keyframes pip-rig-float {
-  0%, 100% { transform: translateY(0) rotate(-.35deg) scale(1); }
-  50% { transform: translateY(-5px) rotate(.35deg) scale(1.008, .992); }
-}
-
-@keyframes pip-rig-speaking {
-  from { transform: translateY(-1px) rotate(-.5deg); }
-  to { transform: translateY(1px) rotate(.5deg); }
-}
-
-.world-pip .character-life--pip-rig.is-talking .character-life__rig {
-  animation-name: pip-rig-speaking-hero;
-}
-
-@keyframes pip-rig-speaking-hero {
-  from { transform: translateY(-1px) rotate(-.5deg) scale(1.28); }
-  to { transform: translateY(1px) rotate(.5deg) scale(1.28); }
-}
-
-@keyframes pip-rig-jaw {
-  from { transform: translateY(1px) rotate(0); }
-  to { transform: translateY(16px) rotate(3deg); }
+  animation: none !important;
 }
 
 @keyframes character-life-blink {

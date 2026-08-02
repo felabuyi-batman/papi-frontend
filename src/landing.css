@@ -101,11 +101,12 @@
 .world-atmosphere__rainbow {
   position: absolute;
   z-index: 1;
-  left: 50%;
-  bottom: 18%;
-  width: min(52vw, 640px);
-  margin-left: calc(min(52vw, 640px) / -2);
+  left: 44%;
+  bottom: 40%;
+  width: min(30vw, 360px);
+  margin-left: calc(min(30vw, 360px) / -2);
   filter: drop-shadow(0 12px 24px rgba(24, 16, 110, 0.18));
+  opacity: 0.88;
 }
 
 .world-atmosphere__cloud {
@@ -227,41 +228,19 @@
   box-shadow: 0 -16px 40px rgba(18, 92, 44, 0.25);
 }
 
-/* ---------- Pip - right side on desktop, never crushed ---------- */
+/* ---------- Pip lives inside the hero stage (never fixed over CTAs) ---------- */
 
 .world-pip {
-  position: fixed;
-  z-index: 6;
-  pointer-events: none;
+  position: relative;
+  z-index: 2;
+  width: min(100%, 360px);
+  margin: 0 auto;
   transform-origin: 50% 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 30px;
-}
-
-.world-pip.is-hidden {
-  pointer-events: none !important;
-}
-
-.world-pip.is-visible .world-pip__hit {
-  pointer-events: auto;
-}
-
-.world-pip.is-desktop {
-  right: clamp(1vw, 3vw, 48px);
-  left: auto;
-  bottom: max(4vh, 28px);
-  width: min(38vw, 420px);
-}
-
-.world-pip.is-mobile {
-  left: 50%;
-  right: auto;
-  bottom: max(3vh, 16px);
-  width: min(62vw, 280px);
-  margin-left: 0;
-  translate: -50% 0;
+  gap: 12px;
+  pointer-events: none;
 }
 
 .world-pip__bubble {
@@ -269,12 +248,11 @@
   max-width: 16ch;
   padding: 10px 14px;
   border-radius: 14px;
-  background: rgba(255, 253, 248, 0.94);
+  background: rgba(255, 253, 248, 0.96);
   color: var(--night);
   font: 750 0.9rem / 1.25 var(--font-body);
   box-shadow: 0 8px 18px rgba(24, 16, 110, 0.16);
   text-align: center;
-  transform: none;
   pointer-events: none;
 }
 
@@ -290,24 +268,34 @@
   transform-origin: 50% 100%;
 }
 
+.world-pip__hit .character-life {
+  overflow: visible;
+  /* Shadow on the whole rig so body + beak stay locked together */
+  filter: drop-shadow(0 18px 20px rgba(20, 12, 90, 0.32));
+}
+
 .world-pip__hit .character-life__art,
 .world-pip__hit .character-life__rig-body {
   display: block;
   width: 100%;
-  filter: drop-shadow(0 24px 24px rgba(20, 12, 90, 0.35));
-  animation: character-bob 3.6s ease-in-out infinite;
+  /* Never bob body alone — that desyncs the hinged beak from the face */
+  animation: none;
+}
+
+/* Beak layers are cropped 120×N tiles — do NOT stretch them to 100% width */
+.world-pip__hit .character-life__rig-beak {
+  display: block;
+  animation: none;
 }
 
 .world-pip__hit.is-poked {
   animation: pip-poke 0.65s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.world-pip__hit.is-listening .character-life__art,
-.world-pip__hit.is-listening .character-life__rig-body,
-.world-pip__hit.is-modeling .character-life__art,
-.world-pip__hit.is-modeling .character-life__rig-body {
+.world-pip__hit.is-listening .character-life,
+.world-pip__hit.is-modeling .character-life {
   filter: drop-shadow(0 0 32px rgba(255, 79, 160, 0.75))
-    drop-shadow(0 24px 24px rgba(20, 12, 90, 0.35));
+    drop-shadow(0 18px 20px rgba(20, 12, 90, 0.35));
 }
 
 .world-pip__ring {
@@ -490,73 +478,130 @@
   outline-offset: 2px;
 }
 
-/* ---------- Split hero - brand + copy LEFT, Pip owns RIGHT ---------- */
+/* ---------- Hero stage: brand + proof line, Pip cast, then seat CTA ---------- */
 
 .stage-hero {
   position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(260px, 0.95fr);
+  grid-template-areas:
+    "intro cast"
+    "actions cast";
+  column-gap: clamp(20px, 4vw, 56px);
+  row-gap: clamp(18px, 3vh, 28px);
+  align-items: end;
   min-height: 100dvh;
   padding:
-    clamp(88px, 12vh, 120px)
+    clamp(96px, 12vh, 128px)
     clamp(20px, 5vw, 64px)
-    clamp(120px, 28vh, 280px);
-  color: #ffffff;
+    clamp(40px, 8vh, 72px);
+  color: #fffdf8;
+  isolation: isolate;
 }
 
-.stage-hero__copy {
-  width: min(52vw, 560px);
-  max-width: 100%;
+/* Soft left wash for contrast — not a card, just readable type over sky */
+.stage-hero::before {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: 0 auto 0 0;
+  width: min(62%, 680px);
+  background: linear-gradient(
+    100deg,
+    rgba(22, 14, 68, 0.34) 0%,
+    rgba(22, 14, 68, 0.12) 48%,
+    rgba(22, 14, 68, 0) 100%
+  );
+  pointer-events: none;
+}
+
+.stage-hero__intro {
+  grid-area: intro;
+  position: relative;
+  z-index: 2;
+  max-width: 34rem;
+  align-self: end;
   text-align: left;
 }
 
+.stage-hero__cast {
+  grid-area: cast;
+  position: relative;
+  z-index: 2;
+  align-self: end;
+  justify-self: center;
+  width: min(100%, 400px);
+  padding-bottom: clamp(4px, 1.5vh, 18px);
+}
+
+.stage-hero__actions {
+  grid-area: actions;
+  position: relative;
+  z-index: 5;
+  max-width: 28rem;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .stage-hero__brand {
-  margin: 0 0 10px;
-  font: 600 clamp(3.6rem, 9vw, 6.8rem) / 0.86 var(--font-display);
+  margin: 0 0 12px;
+  color: #ffffff;
+  font: 600 clamp(3.8rem, 8.5vw, 6.4rem) / 0.86 var(--font-display);
   letter-spacing: -0.05em;
-  text-shadow: 0 2px 0 rgba(24, 16, 110, 0.22);
+  text-shadow:
+    0 3px 0 rgba(24, 16, 110, 0.55),
+    0 14px 34px rgba(12, 8, 48, 0.55);
   animation: brand-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .stage-hero h1 {
   margin: 0;
-  max-width: 15ch;
-  font-size: clamp(1.4rem, 2.4vw, 2.05rem);
+  max-width: 16ch;
+  color: #ffffff;
+  font-size: clamp(1.45rem, 2.35vw, 2.1rem);
   line-height: 1.18;
-  text-shadow: 0 1px 0 rgba(24, 16, 110, 0.28);
+  text-shadow:
+    0 2px 0 rgba(24, 16, 110, 0.5),
+    0 10px 26px rgba(12, 8, 48, 0.5);
   animation: brand-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
 }
 
 .stage-hero h1 em {
   display: block;
   margin-top: 0.15em;
+  color: var(--sunshine);
 }
 
 .stage-hero__sub {
-  margin: 16px 0 0;
-  max-width: 34ch;
-  font-size: clamp(0.95rem, 1.35vw, 1.1rem);
-  font-weight: 700;
+  margin: 14px 0 0;
+  max-width: 30ch;
+  color: #fffdf8;
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
+  font-weight: 750;
   line-height: 1.4;
-  text-shadow: 0 2px 10px rgba(24, 16, 110, 0.4);
+  text-shadow: 0 2px 12px rgba(18, 12, 72, 0.45);
   animation: brand-settle 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.14s both;
 }
 
 .stage-hero__plays {
-  margin: 10px 0 0;
-  font-size: 0.85rem;
+  margin: 12px 0 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(24, 16, 72, 0.28);
+  color: #fffdf8;
+  font-size: 0.84rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  opacity: 0.92;
-  text-shadow: 0 2px 8px rgba(24, 16, 110, 0.35);
+  backdrop-filter: blur(6px);
 }
 
 .stage-hero__ctaRow {
   position: relative;
-  z-index: 8;
-  margin-top: 22px;
+  z-index: 4;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -609,12 +654,12 @@
 }
 
 .store-availability--hero {
-  margin-top: 14px;
+  margin-top: 0;
 }
 
 .landing-waitlist {
-  width: min(100%, 440px);
-  margin-top: 18px;
+  width: min(100%, 420px);
+  margin-top: 0;
 }
 
 .landing-waitlist > label {
@@ -1733,26 +1778,73 @@
   }
 
   .stage-hero {
-    min-height: 100dvh;
-    padding: 88px 20px 46vh;
-    justify-content: flex-start;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "intro"
+      "cast"
+      "actions";
+    align-items: stretch;
+    min-height: auto;
+    padding: 92px 20px 48px;
+    row-gap: 22px;
   }
 
-  .world-pip.is-mobile {
-    bottom: max(6vh, 24px);
+  .stage-hero::before {
+    inset: 0;
+    width: auto;
+    background: linear-gradient(
+      180deg,
+      rgba(22, 14, 68, 0.22) 0%,
+      rgba(22, 14, 68, 0.06) 40%,
+      rgba(22, 14, 68, 0) 62%
+    );
   }
 
-  .stage-hero__copy {
+  .world-atmosphere__rainbow {
+    left: 50%;
+    bottom: 62%;
+    width: min(64vw, 240px);
+    margin-left: calc(min(64vw, 240px) / -2);
+    opacity: 0.55;
+  }
+
+  .stage-hero__intro,
+  .stage-hero__actions {
+    max-width: none;
     width: 100%;
     text-align: center;
   }
 
-  .stage-hero h1 {
+  .stage-hero__cast {
+    width: min(58vw, 220px);
+    justify-self: center;
+    padding-bottom: 0;
+  }
+
+  .chirp-nav__actions {
+    gap: 6px;
+  }
+
+  .chirp-nav__demo {
+    display: none;
+  }
+
+  .chirp-nav__grownups {
+    padding: 10px 12px;
+    font-size: 0.85rem;
+  }
+
+  .world-pip {
+    width: 100%;
+  }
+
+  .stage-hero h1,
+  .stage-hero__sub {
     margin-left: auto;
     margin-right: auto;
   }
 
-  .stage-hero__sub {
+  .stage-hero__plays {
     margin-left: auto;
     margin-right: auto;
   }
@@ -1920,7 +2012,8 @@
   .stage-hero__brand,
   .stage-hero h1,
   .stage-hero__sub,
-  .stage-hero__ctaRow {
+  .stage-hero__ctaRow,
+  .stage-hero__actions {
     animation: none !important;
   }
 }

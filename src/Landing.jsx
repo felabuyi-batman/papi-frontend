@@ -423,7 +423,6 @@ function WorldAtmosphere({ scrollYProgress, isBlooming, berryCount, onToyInterac
 }
 
 function WorldPip({
-  isVisible,
   isListening,
   isScoring = false,
   isModeling,
@@ -436,27 +435,13 @@ function WorldPip({
   onPokeAnimationEnd,
 }) {
   const prefersReducedMotion = useReducedMotion()
-  const [isNarrowViewport, setIsNarrowViewport] = useState(false)
-
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(max-width: 860px)')
-    const syncViewport = () => setIsNarrowViewport(mediaQuery.matches)
-    syncViewport()
-    mediaQuery.addEventListener('change', syncViewport)
-    return () => mediaQuery.removeEventListener('change', syncViewport)
-  }, [])
 
   return (
     <motion.div
-      className={`world-pip ${isNarrowViewport ? 'is-mobile' : 'is-desktop'} ${isVisible ? 'is-visible' : 'is-hidden'}`}
-      aria-hidden={!isVisible}
-      initial={false}
-      animate={
-        prefersReducedMotion
-          ? { opacity: isVisible ? 1 : 0 }
-          : { opacity: isVisible ? 1 : 0, y: isVisible ? 0 : 28, scale: isVisible ? 1 : 0.92 }
-      }
-      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      className="world-pip"
+      initial={prefersReducedMotion ? false : { opacity: 0, y: 22, scale: 0.94 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
     >
       <p className="world-pip__bubble" aria-live="polite">
         {bubbleText}
@@ -858,7 +843,6 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
   const [isBlooming, setIsBlooming] = useState(false)
   const [bubbleText, setBubbleText] = useState('Tap me to play')
   const [hatchedFriendIds, setHatchedFriendIds] = useState(() => new Set())
-  const [isPipOnStage, setIsPipOnStage] = useState(true)
   const [sessionsUsed, setSessionsUsed] = useState(() => (
     typeof window === 'undefined' ? 0 : readSessionsUsed()
   ))
@@ -915,19 +899,6 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
     return () => pipVoiceBridge.disconnect()
   }, [])
 
-  useEffect(() => {
-    const heroSection = document.getElementById('play')
-    if (!heroSection) return undefined
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        setIsPipOnStage(entry.isIntersecting && entry.intersectionRatio >= 0.35)
-      },
-      { threshold: [0.2, 0.35, 0.55, 0.75] },
-    )
-    observer.observe(heroSection)
-    return () => observer.disconnect()
-  }, [])
-
   async function handlePipTap() {
     setPipPokeCount((count) => count + 1)
     setIsPipPoked(true)
@@ -977,20 +948,6 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
         onToyInteract={handleToyInteract}
       />
 
-      <WorldPip
-        isVisible={isPipOnStage}
-        isListening={status === 'listening'}
-        isScoring={false}
-        isModeling={status === 'talking'}
-        bubbleText={bubbleLive}
-        scoreOutOfTen={scoreOutOfTen}
-        triesCount={triesCount}
-        pokeBurstCount={pipPokeCount}
-        isPoked={isPipPoked}
-        onPipTap={handlePipTap}
-        onPokeAnimationEnd={() => setIsPipPoked(false)}
-      />
-
       <header className="chirp-nav">
         <PipaWordmark className="chirp-wordmark" />
         <nav aria-label="Main navigation">
@@ -1033,20 +990,39 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
 
       <main>
         <section className="stage-hero" id="play" aria-label="Meet Pip">
-          <div className="stage-hero__copy">
+          <div className="stage-hero__intro">
             <p className="stage-hero__brand">pipa!</p>
             <h1>
               Speech practice your kid begs for.
               <em> Progress you can prove.</em>
             </h1>
             <p className="stage-hero__sub">
-              Tap Pip or a friend and talk. Three free chats on us.
+              Tap Pip and talk. Three free chats on us.
             </p>
             <p className="stage-hero__plays" aria-live="polite">
               {isVoiceLocked
                 ? 'Free chats used up'
                 : `${sessionsLeft} free chat${sessionsLeft === 1 ? '' : 's'} left`}
             </p>
+          </div>
+
+          <div className="stage-hero__cast">
+            <WorldPip
+              isListening={status === 'listening'}
+              isScoring={false}
+              isModeling={status === 'talking'}
+              bubbleText={bubbleLive}
+              scoreOutOfTen={scoreOutOfTen}
+              triesCount={triesCount}
+              pokeBurstCount={pipPokeCount}
+              isPoked={isPipPoked}
+              onPipTap={handlePipTap}
+              onPokeAnimationEnd={() => setIsPipPoked(false)}
+            />
+          </div>
+
+          <div className="stage-hero__actions">
+            <WaitlistForm />
             <div className="stage-hero__ctaRow">
               {typeof onGrownUps === 'function' && (
                 <button
@@ -1067,7 +1043,6 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
                 </button>
               )}
             </div>
-            <WaitlistForm />
             <StoreAvailability className="store-availability--hero" />
           </div>
         </section>
