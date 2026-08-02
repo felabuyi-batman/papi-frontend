@@ -1,8 +1,10 @@
 // SpeechC-only client. In Vite DEV, same-origin `/api` proxies to apps/api.
 import { signOutSupabase, supabase } from './supabase.js'
 
+// Production must never silently fall back to localhost (breaks Vercel).
+const DEFAULT_PRODUCTION_API = 'https://api-production-fa6b.up.railway.app'
 const BASE = import.meta.env.VITE_API_URL
-  || (import.meta.env.DEV ? '' : 'http://127.0.0.1:8000')
+  || (import.meta.env.DEV ? '' : DEFAULT_PRODUCTION_API)
 
 const LEVEL_LADDER = {
   isolation: 0,
@@ -97,14 +99,29 @@ function apiPath(path) {
 }
 
 async function refreshAccess() {
-  // Prefer Supabase session refresh (email auth).
+  // Prefer Supabase session refresh (email auth). Never send a Supabase refresh
+  // token to SpeechC /auth/refresh — that 401 path used to hard-logout parents.
+  let supabaseSession = null
   try {
-    const { data, error } = await supabase.auth.refreshSession()
-    if (!error && data.session?.access_token) {
-      setToken(data.session.access_token, data.session.refresh_token || null)
-      return data.session.access_token
+    const { data } = await supabase.auth.getSession()
+    supabaseSession = data.session || null
+  } catch { /* ignore */ }
+
+  if (supabaseSession) {
+    try {
+      const { data, error } = await supabase.auth.refreshSession()
+      if (!error && data.session?.access_token) {
+        setToken(data.session.access_token, data.session.refresh_token || null)
+        return data.session.access_token
+      }
+    } catch { /* keep existing token below */ }
+
+    if (supabaseSession.access_token) {
+      setToken(supabaseSession.access_token, supabaseSession.refresh_token || null)
+      throw new Error('Could not refresh session — try again')
     }
-  } catch { /* fall through to legacy refresh */ }
+    throw new Error('Session expired — please sign in again')
+  }
 
   if (!refreshToken) throw new Error('Session expired — please sign in again')
   let res
@@ -288,7 +305,11 @@ export const api = {
   /** Start Stripe Checkout for the $99 founding waitlist seat. */
   startWaitlistCheckout: (email, source = 'landing') => req('/waitlist/checkout', {
     method: 'POST',
-    json: { email, source },
+    json: {
+      email,
+      source,
+      return_origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+    },
   }),
 
   waitlistCheckoutStatus: (sessionId) => req(`/waitlist/checkout/${encodeURIComponent(sessionId)}`),
@@ -586,8 +607,8 @@ export const api = {
     }
     if (!res.ok) {
       const detail = await res.json().catch(() => ({}))
-      // Soft failure for landing — PipVoiceBridge falls back.
-      if (res.status === 503 || res.status === 502) {
+      // Soft failure for landing — PipVoiceBridge falls back (incl. legacy 404 hosts).
+      if (res.status === 503 || res.status === 502 || res.status === 404) {
         return { ok: false, ephemeral_token: null, fallback: 'speech_synthesis', detail: detail.detail }
       }
       throw new Error(detail.detail || `Demo realtime failed (${res.status})`)
