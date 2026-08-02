@@ -12,6 +12,7 @@ import {
 } from './parent/ParentNest.jsx'
 import SlpNest from './parent/SlpNest.jsx'
 import Landing from './Landing.jsx'
+import { PrivacyPolicy, TermsOfUse } from './LegalPages.jsx'
 import './theme.css'
 
 const DEMO_CHILD = {
@@ -19,10 +20,21 @@ const DEMO_CHILD = {
   display_name: 'Sam',
 }
 
+function viewFromPathname(pathname = '/') {
+  if (pathname.startsWith('/auth/callback')) return 'auth-callback'
+  if (pathname === '/privacy' || pathname === '/privacy/') return 'privacy'
+  if (pathname === '/terms' || pathname === '/terms/') return 'terms'
+  return 'landing'
+}
+
+function goHome(setView) {
+  window.history.pushState({}, '', '/')
+  setView('landing')
+}
+
 function initialView() {
   if (typeof window === 'undefined') return 'landing'
-  if (window.location.pathname.startsWith('/auth/callback')) return 'auth-callback'
-  return 'landing'
+  return viewFromPathname(window.location.pathname)
 }
 
 export default function App() {
@@ -31,12 +43,14 @@ export default function App() {
   const [active, setActive] = useState(null)
 
   useEffect(() => {
-    if (view === 'auth-callback') return undefined
-    if (window.location.pathname.startsWith('/auth/callback')) {
-      setView('auth-callback')
+    function syncViewFromLocation() {
+      setView(viewFromPathname(window.location.pathname))
     }
-    return undefined
-  }, [view])
+
+    window.addEventListener('popstate', syncViewFromLocation)
+    syncViewFromLocation()
+    return () => window.removeEventListener('popstate', syncViewFromLocation)
+  }, [])
 
   const loadKids = async (preferChildId = null) => {
     try {
@@ -67,6 +81,14 @@ export default function App() {
         onSlp={() => setView('slp')}
       />
     )
+  }
+
+  if (view === 'privacy') {
+    return <PrivacyPolicy onHome={() => goHome(setView)} />
+  }
+
+  if (view === 'terms') {
+    return <TermsOfUse onHome={() => goHome(setView)} />
   }
 
   if (view === 'slp') {

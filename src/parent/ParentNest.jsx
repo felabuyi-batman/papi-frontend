@@ -190,7 +190,7 @@ export function ParentAuth({ onDone, onBack }) {
       <p className="nest__lede">
         {isSignup
           ? 'Sign up with email. We’ll send a confirmation link before anything private opens.'
-          : 'Sign in with the email you verified. Private progress for parents — Pip keeps practice playful for kids.'}
+          : 'Sign in with the email you verified. Private progress for parents — Pipa keeps practice playful for kids.'}
       </p>
 
       <form className="nest__panel" onSubmit={submit}>

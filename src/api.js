@@ -86,7 +86,7 @@ export async function acceptSupabaseSession() {
 function friendlyNetworkError(error) {
   const message = String(error?.message || error || '')
   if (/failed to fetch|networkerror|load failed|network request failed/i.test(message)) {
-    return 'Pip’s nest is offline. Start the API (npm run dev in chirp-frontend), then try again.'
+    return 'Pipa’s nest is offline. Start the API (npm run dev in chirp-frontend), then try again.'
   }
   return message || 'Something went wrong.'
 }
@@ -164,7 +164,7 @@ async function req(path, {
     res = await fetch(apiPath(path), { method, headers, body, signal })
   } catch (error) {
     if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
-      throw new Error('Pip took too long to answer. Tap to try that turn again.')
+      throw new Error('Pipa took too long to answer. Tap to try that turn again.')
     }
     throw new Error(friendlyNetworkError(error))
   }

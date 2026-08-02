@@ -57,7 +57,7 @@ const NEST_FRIENDS = [
 const JOURNEY_OPENING = [
   {
     stepId: 'listen',
-    title: "Pip's Listening Game finds their starting point",
+    title: "Pipa's Listening Game finds their starting point",
     body: '26 picture cards. No reading. No right-or-wrong shown to the child. You get an honest sound-by-sound baseline.',
     artPath: '/characters/pip-hop.webp',
   },
@@ -71,7 +71,7 @@ const JOURNEY_OPENING = [
 ]
 
 const JOURNEY_TALK = {
-  title: 'Then Pip starts talking back',
+  title: 'Then Pipa starts talking back',
   body: 'Real voice conversations, scored in connected speech, with your child learning to catch their own sounds.',
   artPath: '/characters/friend-lulu-lion.webp',
 }
@@ -85,7 +85,7 @@ const JOURNEY_GRAD = {
 const PRACTICE_TARGET_WORD = 'sun'
 const PRACTICE_BERRY_GOAL = 8
 
-/** World toys open a short Pip conversation (max 3 free sessions on the page). */
+/** World toys open a short Pipa conversation (max 3 free sessions on the page). */
 const WORLD_TOYS = {
   sun: {
     topic: 'the sunny sky',
@@ -201,28 +201,21 @@ function PipaWordmark({ className }) {
   )
 }
 
-function StoreAvailability({ className = '' }) {
-  return (
-    <div
-      className={`store-availability ${className}`.trim()}
-      aria-label="Pipa mobile apps coming soon"
-    >
-      <span className="store-availability__badge store-availability__badge--ios">
-        <img src="/brand/apple.svg" alt="" width="16" height="16" />
-        <span>App Store soon</span>
-      </span>
-      <span className="store-availability__badge store-availability__badge--android">
-        <img src="/brand/google-play.svg" alt="" width="16" height="16" />
-        <span>Google Play soon</span>
-      </span>
-    </div>
-  )
-}
-
-function WaitlistForm({ source = 'landing-hero' }) {
+function WaitlistForm({
+  source = 'landing-hero',
+  autoFocus = false,
+  heading = 'Secure a founding seat',
+}) {
   const [email, setEmail] = useState('')
   const [status, setStatus] = useState('idle') // idle | saving | paid | already | cancel | error
   const [message, setMessage] = useState('')
+  const emailInputRef = useRef(null)
+
+  useEffect(() => {
+    if (autoFocus) {
+      emailInputRef.current?.focus()
+    }
+  }, [autoFocus])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -290,9 +283,10 @@ function WaitlistForm({ source = 'landing-hero' }) {
 
   return (
     <form className={`landing-waitlist ${locked ? 'is-secured' : ''}`} onSubmit={submit}>
-      <label htmlFor={`waitlist-email-${source}`}>Secure a founding seat</label>
+      <label htmlFor={`waitlist-email-${source}`}>{heading}</label>
       <div>
         <input
+          ref={emailInputRef}
           id={`waitlist-email-${source}`}
           type="email"
           autoComplete="email"
@@ -310,6 +304,64 @@ function WaitlistForm({ source = 'landing-hero' }) {
         {message || 'One-time $99 holds your family’s place. Card via Stripe — no spam nest mail.'}
       </p>
     </form>
+  )
+}
+
+function EarlyAccessControl({
+  isOpen,
+  onOpenChange,
+  source = 'landing-header',
+  buttonClassName = 'chirp-nav__earlyBtn',
+  buttonLabel = 'Get early access',
+}) {
+  const panelRef = useRef(null)
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+
+    function onPointerDown(event) {
+      if (!panelRef.current?.contains(event.target)) {
+        onOpenChange(false)
+      }
+    }
+    function onKeyDown(event) {
+      if (event.key === 'Escape') onOpenChange(false)
+    }
+
+    document.addEventListener('pointerdown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [isOpen, onOpenChange])
+
+  return (
+    <div className={`chirp-nav__early ${isOpen ? 'is-open' : ''}`} ref={panelRef}>
+      <button
+        type="button"
+        className={buttonClassName}
+        aria-expanded={isOpen}
+        aria-controls="early-access-panel"
+        onClick={() => onOpenChange(!isOpen)}
+      >
+        {buttonLabel}
+      </button>
+      {isOpen && (
+        <div
+          className="chirp-nav__earlyPanel"
+          id="early-access-panel"
+          role="dialog"
+          aria-label="Secure a founding seat"
+        >
+          <WaitlistForm
+            source={source}
+            autoFocus
+            heading="Secure your seat · $99"
+          />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -453,10 +505,10 @@ function WorldPip({
         onAnimationEnd={onPokeAnimationEnd}
         aria-label={
           isModeling
-            ? 'Pip is talking'
+            ? 'Pipa is talking'
             : isListening
-              ? 'Your turn - talk to Pip'
-              : 'Tap Pip to play'
+              ? 'Your turn - talk to Pipa'
+              : 'Tap Pipa to play'
         }
       >
         <AnimatedCharacterArt
@@ -580,6 +632,8 @@ function CrackedEgg({ nestFriend, cardIndex, isAwake, onWake, onHatched, playWit
             variant={isHatched ? 'friend' : 'egg'}
             talking={false}
             floating={false}
+            flapping={false}
+            blinkDelayMs={cardIndex * 420}
             className={`${isHatched ? 'is-friend' : 'is-egg'} ${isJumping ? 'is-jumping' : ''}`}
             onAnimationEnd={() => setIsJumping(false)}
           />
@@ -617,7 +671,14 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
                 viewport={{ once: true, amount: 0.35 }}
                 transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
               >
-                <img src={step.artPath} alt="" className="story-beat__art" />
+                <AnimatedCharacterArt
+                  className="story-beat__art"
+                  src={step.artPath}
+                  variant="friend"
+                  floating={false}
+                  blinkDelayMs={stepIndex * 420}
+                  alt=""
+                />
                 <div className="story-beat__copy">
                   <h3>{step.title}</h3>
                   <p>{step.body}</p>
@@ -640,7 +701,13 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
             viewport={{ once: true, amount: 0.4 }}
             transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
           >
-            <img src={JOURNEY_TALK.artPath} alt="" />
+            <AnimatedCharacterArt
+              src={JOURNEY_TALK.artPath}
+              variant="friend"
+              floating={false}
+              blinkDelayMs={840}
+              alt=""
+            />
             <div>
               <h3>{JOURNEY_TALK.title}</h3>
               <p>{JOURNEY_TALK.body}</p>
@@ -654,7 +721,13 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
             viewport={{ once: true, amount: 0.4 }}
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           >
-            <img src={JOURNEY_GRAD.artPath} alt="" />
+            <AnimatedCharacterArt
+              src={JOURNEY_GRAD.artPath}
+              variant="friend"
+              floating={false}
+              blinkDelayMs={1260}
+              alt=""
+            />
             <h3>{JOURNEY_GRAD.title}</h3>
             <p>{JOURNEY_GRAD.body}</p>
           </motion.article>
@@ -680,10 +753,10 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
               <span>in 10</span>
             </p>
             {triesCount === 0 ? (
-              <p className="proof-dial__hint">Scroll up, tap Pip, and talk. Your play score shows up here.</p>
+              <p className="proof-dial__hint">Scroll up, tap Pipa, and talk. Your play score shows up here.</p>
             ) : (
               <p className="proof-dial__hint">
-                Live from Pip · {hitsCount} clear of {triesCount} · {berryCount} berries
+                Live from Pipa · {hitsCount} clear of {triesCount} · {berryCount} berries
               </p>
             )}
           </div>
@@ -768,7 +841,13 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
               Answers before
               <em> you ask</em>
             </h2>
-            <img className="trust-head__art" src="/characters/pip-star.webp" alt="" />
+            <AnimatedCharacterArt
+              className="trust-head__art"
+              src="/characters/pip-star.webp"
+              variant="friend"
+              floating={false}
+              alt=""
+            />
           </div>
           <div className="trust-rows">
             <article>
@@ -777,7 +856,7 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
             </article>
             <article>
               <h3>Every conversation on the record</h3>
-              <p>Live Pip chats are transcribed, visible to you, and safety-screened.</p>
+              <p>Live Pipa chats are transcribed, visible to you, and safety-screened.</p>
             </article>
             <article>
               <h3>Honest scope</h3>
@@ -820,8 +899,12 @@ function ChorusMember({ memberName, characterImagePath, chorusIndex, phoneme, pr
         onClick={handleChorusTap}
         aria-label={`Talk with ${memberName}`}
       >
-        <img
+        <AnimatedCharacterArt
           src={characterImagePath}
+          variant="friend"
+          floating={false}
+          flapping={false}
+          blinkDelayMs={chorusIndex * 380}
           alt=""
           className={isJumping ? 'is-jumping' : ''}
           onAnimationEnd={() => setIsJumping(false)}
@@ -832,8 +915,18 @@ function ChorusMember({ memberName, characterImagePath, chorusIndex, phoneme, pr
   )
 }
 
+function shouldOpenEarlyAccessFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location.search)
+    return Boolean(params.get('waitlist'))
+  } catch {
+    return false
+  }
+}
+
 export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
   const pageRef = useRef(null)
+  const [isEarlyAccessOpen, setIsEarlyAccessOpen] = useState(() => shouldOpenEarlyAccessFromUrl())
   const [awakeFriend, setAwakeFriend] = useState(null)
   const [pipPokeCount, setPipPokeCount] = useState(0)
   const [isPipPoked, setIsPipPoked] = useState(false)
@@ -890,7 +983,7 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
       setBubbleText('Free play is all done - grab the app for more adventures')
       return null
     }
-    setBubbleText('Pip is talking…')
+    setBubbleText('Pipa is talking…')
     return playWithPip(config)
   }
 
@@ -903,7 +996,7 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
     setPipPokeCount((count) => count + 1)
     setIsPipPoked(true)
     await guardedPlay({
-      topic: 'Pip and the sun sound',
+      topic: 'Pipa and the sun sound',
       promptWord: PRACTICE_TARGET_WORD,
       phoneme: 's',
       opener: `Hi friend! Let's play. Can you say ${PRACTICE_TARGET_WORD}?`,
@@ -931,8 +1024,8 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
   }
 
   const bubbleLive =
-    status === 'talking' ? 'Pip is talking…'
-      : status === 'listening' ? 'Your turn - talk to Pip'
+    status === 'talking' ? 'Pipa is talking…'
+      : status === 'listening' ? 'Your turn - talk to Pipa'
         : bubbleText
 
   return (
@@ -950,32 +1043,7 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
 
       <header className="chirp-nav">
         <PipaWordmark className="chirp-wordmark" />
-        <nav aria-label="Main navigation">
-          <a href="#play">Play</a>
-          <a href="#nest">Nest</a>
-          <a href="#journey">Story</a>
-          <a href="#proof">Proof</a>
-          <a href="#therapists">SLPs</a>
-        </nav>
         <div className="chirp-nav__actions">
-          {typeof onSlp === 'function' && (
-            <button
-              type="button"
-              className="chirp-nav__demo"
-              onClick={onSlp}
-            >
-              For SLPs
-            </button>
-          )}
-          {typeof onTryDemo === 'function' && (
-            <button
-              type="button"
-              className="chirp-nav__demo"
-              onClick={onTryDemo}
-            >
-              Preview nest
-            </button>
-          )}
           {typeof onGrownUps === 'function' && (
             <button
               type="button"
@@ -985,24 +1053,21 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
               Grown-ups
             </button>
           )}
+          <EarlyAccessControl
+            isOpen={isEarlyAccessOpen}
+            onOpenChange={setIsEarlyAccessOpen}
+            source="landing-header"
+          />
         </div>
       </header>
 
       <main>
-        <section className="stage-hero" id="play" aria-label="Meet Pip">
+        <section className="stage-hero" id="play" aria-label="Meet Pipa">
           <div className="stage-hero__intro">
             <p className="stage-hero__brand">pipa!</p>
-            <h1>
-              Speech practice your kid begs for.
-              <em> Progress you can prove.</em>
-            </h1>
+            <h1>Speech therapist your kids beg for.</h1>
             <p className="stage-hero__sub">
-              Tap Pip and talk. Three free chats on us.
-            </p>
-            <p className="stage-hero__plays" aria-live="polite">
-              {isVoiceLocked
-                ? 'Free chats used up'
-                : `${sessionsLeft} free chat${sessionsLeft === 1 ? '' : 's'} left`}
+              From first sounds to full conversation - Pipa coaches every step.
             </p>
           </div>
 
@@ -1022,28 +1087,25 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
           </div>
 
           <div className="stage-hero__actions">
-            <WaitlistForm />
-            <div className="stage-hero__ctaRow">
-              {typeof onGrownUps === 'function' && (
-                <button
-                  type="button"
-                  className="stage-hero__grownups"
-                  onClick={onGrownUps}
-                >
-                  Open the parent nest
-                </button>
-              )}
-              {typeof onTryDemo === 'function' && (
-                <button
-                  type="button"
-                  className="stage-hero__demo"
-                  onClick={onTryDemo}
-                >
-                  Preview the dashboard
-                </button>
-              )}
-            </div>
-            <StoreAvailability className="store-availability--hero" />
+            <button
+              type="button"
+              className="stage-hero__cta"
+              onClick={() => {
+                setIsEarlyAccessOpen(true)
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+            >
+              Get early access · $99
+            </button>
+            {typeof onGrownUps === 'function' && (
+              <button
+                type="button"
+                className="stage-hero__nestLink"
+                onClick={onGrownUps}
+              >
+                Parent nest
+              </button>
+            )}
           </div>
         </section>
 
@@ -1091,7 +1153,7 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
           </h2>
           <ul className="chirp-chorus">
             {[
-              { memberName: 'Pip', characterImagePath: '/characters/pip-hop.webp', phoneme: 's', promptWord: 'sun' },
+              { memberName: 'Pipa', characterImagePath: '/characters/pip-hop.webp', phoneme: 's', promptWord: 'sun' },
               ...NEST_FRIENDS.map((friend) => ({
                 memberName: friend.friendName,
                 characterImagePath: friend.characterImagePath,
@@ -1111,7 +1173,16 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
               />
             ))}
           </ul>
-          <StoreAvailability className="store-availability--finale" />
+          <button
+            type="button"
+            className="stage-finale__cta"
+            onClick={() => {
+              setIsEarlyAccessOpen(true)
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+          >
+            Get early access
+          </button>
         </section>
       </main>
 

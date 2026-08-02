@@ -2,6 +2,57 @@ import { useEffect, useId, useRef, useState } from 'react'
 import './character-life.css'
 
 /**
+ * Per-artwork eyelid geometry (image pixel space). Only eyelids animate —
+ * no body bob, wings, or fake beaks on these sprites.
+ */
+const CHARACTER_EYELID_LAYOUTS = {
+  '/characters/prop-hatching-egg.webp': {
+    viewBox: '0 0 553 822',
+    left: { cx: 197, cy: 317, rx: 36, ry: 40, hingeY: 276, fill: '#F4C53A' },
+    right: { cx: 361, cy: 314, rx: 36, ry: 40, hingeY: 273, fill: '#F4C53A' },
+  },
+  '/characters/friend-stella-star.webp': {
+    viewBox: '0 0 782 833',
+    left: { cx: 310, cy: 408, rx: 34, ry: 35, hingeY: 375, fill: '#F5C93A' },
+    right: { cx: 502, cy: 408, rx: 34, ry: 35, hingeY: 375, fill: '#F5C93A' },
+  },
+  '/characters/friend-rory-rocket.webp': {
+    viewBox: '0 0 549 860',
+    left: { cx: 222, cy: 395, rx: 27, ry: 28, hingeY: 368, fill: '#E8DDD2' },
+    right: { cx: 322, cy: 395, rx: 29, ry: 30, hingeY: 366, fill: '#E8DDD2' },
+  },
+  '/characters/friend-lulu-lion.webp': {
+    viewBox: '0 0 607 830',
+    left: { cx: 214, cy: 305, rx: 33, ry: 34, hingeY: 273, fill: '#F6D45A' },
+    right: { cx: 374, cy: 305, rx: 33, ry: 34, hingeY: 273, fill: '#F6D45A' },
+  },
+  '/characters/friend-theo-thunder.webp': {
+    viewBox: '0 0 827 721',
+    left: { cx: 303, cy: 292, rx: 48, ry: 50, hingeY: 244, fill: '#A9D0F5' },
+    right: { cx: 493, cy: 290, rx: 47, ry: 49, hingeY: 243, fill: '#A9D0F5' },
+  },
+  '/characters/pip-hop.webp': {
+    viewBox: '0 0 673 780',
+    left: { cx: 272, cy: 275, rx: 33, ry: 34, hingeY: 243, fill: '#F4C53A' },
+    right: { cx: 413, cy: 275, rx: 33, ry: 34, hingeY: 243, fill: '#F4C53A' },
+  },
+  '/characters/pip-star.webp': {
+    viewBox: '0 0 632 764',
+    left: { cx: 266, cy: 307, rx: 35, ry: 36, hingeY: 273, fill: '#F4C53A' },
+    right: { cx: 416, cy: 307, rx: 35, ry: 36, hingeY: 273, fill: '#F4C53A' },
+  },
+}
+
+function resolveCharacterSourcePath(src = '') {
+  if (!src) return ''
+  try {
+    return new URL(src, 'https://local.invalid').pathname
+  } catch {
+    return src.split('?')[0]
+  }
+}
+
+/**
  * Exact Pip rig from pip_talking-3.html:
  * body + hinged upper/lower beak layers. Idle bob and talk jaw run on the
  * whole rig (never the body alone), matching the attached demo.
@@ -29,6 +80,7 @@ function RiggedPipCharacter({ alt, talking, floating, className, onAnimationEnd 
     let blinkTimeout
     let blinkFrameId = 0
     let cancelled = false
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
     function applyBlink(blinkValue) {
       if (!lidLeftRef.current || !lidRightRef.current || !lidsRef.current) return
@@ -64,7 +116,7 @@ function RiggedPipCharacter({ alt, talking, floating, className, onAnimationEnd 
     }
 
     function scheduleBlink() {
-      if (cancelled) return
+      if (cancelled || prefersReducedMotion) return
       blinkTimeout = window.setTimeout(doBlink, 2000 + Math.random() * 2800)
     }
 
@@ -221,8 +273,115 @@ function RiggedPipCharacter({ alt, talking, floating, className, onAnimationEnd 
 }
 
 /**
- * Pip uses the supplied hinged artwork rig. Hatchlings retain a lightweight
- * blink layer because their source art does not include separate facial assets.
+ * Flat character artwork with eyelid overlays that blink on a staggered loop.
+ */
+function BlinkingArtworkCharacter({
+  src,
+  alt,
+  variantClassName,
+  className,
+  onAnimationEnd,
+  blinkDelayMs = 0,
+  eyelidLayout,
+}) {
+  const lidsRef = useRef(null)
+  const lidLeftRef = useRef(null)
+  const lidRightRef = useRef(null)
+  const leftEye = eyelidLayout.left
+  const rightEye = eyelidLayout.right
+
+  useEffect(() => {
+    let blinkTimeout
+    let blinkFrameId = 0
+    let cancelled = false
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    function applyBlink(blinkValue) {
+      if (!lidLeftRef.current || !lidRightRef.current || !lidsRef.current) return
+      lidsRef.current.setAttribute('opacity', blinkValue > 0.02 ? '1' : '0')
+      const scale = blinkValue.toFixed(3)
+      lidLeftRef.current.setAttribute(
+        'transform',
+        `translate(${leftEye.cx} ${leftEye.hingeY}) scale(1 ${scale}) translate(${-leftEye.cx} ${-leftEye.hingeY})`,
+      )
+      lidRightRef.current.setAttribute(
+        'transform',
+        `translate(${rightEye.cx} ${rightEye.hingeY}) scale(1 ${scale}) translate(${-rightEye.cx} ${-rightEye.hingeY})`,
+      )
+    }
+
+    function doBlink() {
+      if (cancelled) return
+      const startedAt = performance.now()
+      function stepBlink(now) {
+        if (cancelled) return
+        const elapsed = (now - startedAt) / 160
+        const blinkValue = elapsed < 0.5 ? elapsed * 2 : Math.max(0, 1 - (elapsed - 0.5) * 2)
+        applyBlink(blinkValue)
+        if (elapsed < 1) {
+          blinkFrameId = window.requestAnimationFrame(stepBlink)
+        } else {
+          applyBlink(0)
+          scheduleBlink()
+        }
+      }
+      blinkFrameId = window.requestAnimationFrame(stepBlink)
+    }
+
+    function scheduleBlink() {
+      if (cancelled || prefersReducedMotion) return
+      blinkTimeout = window.setTimeout(doBlink, 2200 + blinkDelayMs + Math.random() * 2600)
+    }
+
+    applyBlink(0)
+    scheduleBlink()
+    return () => {
+      cancelled = true
+      window.clearTimeout(blinkTimeout)
+      window.cancelAnimationFrame(blinkFrameId)
+    }
+  }, [blinkDelayMs, leftEye.cx, leftEye.hingeY, rightEye.cx, rightEye.hingeY])
+
+  return (
+    <span
+      className={['character-life', variantClassName, className].filter(Boolean).join(' ')}
+      onAnimationEnd={onAnimationEnd}
+    >
+      <img className="character-life__art" src={src} alt={alt} />
+      <svg
+        className="character-life__lids"
+        viewBox={eyelidLayout.viewBox}
+        preserveAspectRatio="xMidYMid meet"
+        aria-hidden="true"
+      >
+        <g ref={lidsRef} opacity="0">
+          <ellipse
+            ref={lidLeftRef}
+            className="character-life__lid"
+            cx={leftEye.cx}
+            cy={leftEye.cy}
+            rx={leftEye.rx}
+            ry={leftEye.ry}
+            fill={leftEye.fill}
+          />
+          <ellipse
+            ref={lidRightRef}
+            className="character-life__lid"
+            cx={rightEye.cx}
+            cy={rightEye.cy}
+            rx={rightEye.rx}
+            ry={rightEye.ry}
+            fill={rightEye.fill}
+          />
+        </g>
+      </svg>
+    </span>
+  )
+}
+
+/**
+ * Pip uses the hinged artwork rig. Flat characters blink eyelids only when
+ * their source art has a measured eyelid layout.
  */
 export default function AnimatedCharacterArt({
   src,
@@ -233,6 +392,7 @@ export default function AnimatedCharacterArt({
   flapping = false,
   className = '',
   onAnimationEnd,
+  blinkDelayMs = 0,
 }) {
   if (variant === 'pip') {
     return (
@@ -246,36 +406,30 @@ export default function AnimatedCharacterArt({
     )
   }
 
-  // Eggs blink only. Friends stay as supplied artwork — no fake beak overlays.
-  const showBlink = variant === 'egg'
+  const sourcePath = resolveCharacterSourcePath(src)
+  const eyelidLayout = CHARACTER_EYELID_LAYOUTS[sourcePath]
+  const variantClassName = variant === 'egg' ? 'character-life--egg' : 'character-life--friend'
+
+  if (eyelidLayout) {
+    return (
+      <BlinkingArtworkCharacter
+        src={src}
+        alt={alt}
+        variantClassName={variantClassName}
+        className={className}
+        onAnimationEnd={onAnimationEnd}
+        blinkDelayMs={blinkDelayMs}
+        eyelidLayout={eyelidLayout}
+      />
+    )
+  }
 
   return (
     <span
-      className={[
-        'character-life',
-        `character-life--${variant}`,
-        floating ? 'is-floating' : '',
-        flapping ? 'is-flapping' : '',
-        className,
-      ].filter(Boolean).join(' ')}
+      className={['character-life', variantClassName, className].filter(Boolean).join(' ')}
       onAnimationEnd={onAnimationEnd}
     >
-      {flapping && (
-        <>
-          <span className="character-life__wing character-life__wing--left" aria-hidden="true">
-            <i /><i /><i />
-          </span>
-          <span className="character-life__wing character-life__wing--right" aria-hidden="true">
-            <i /><i /><i />
-          </span>
-        </>
-      )}
       <img className="character-life__art" src={src} alt={alt} />
-      {showBlink && (
-        <span className="character-life__eyes" aria-hidden="true">
-          <i /><i />
-        </span>
-      )}
     </span>
   )
 }
