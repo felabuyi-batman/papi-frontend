@@ -1,0 +1,12 @@
+node_modules/
+dist/
+tmp/
+output/
+.env
+.env.local
+.env.*.local
+.DS_Store
+.playwright-browsers/
+test-results/
+playwright-report/
+.vercel

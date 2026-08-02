@@ -1,0 +1,334 @@
+.character-life {
+  position: relative;
+  display: block;
+  width: 100%;
+  isolation: isolate;
+  transform-origin: 50% 78%;
+}
+
+.character-life__art {
+  position: relative;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.character-life--pip-rig {
+  aspect-ratio: 1;
+}
+
+.character-life.character-life--pip-rig.is-floating {
+  animation: pip-rig-float 3.2s ease-in-out infinite;
+}
+
+.character-life__rig {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 90%;
+}
+
+.world-pip .character-life__rig {
+  transform: scale(1.28);
+}
+
+.world-pip .character-life.character-life--pip-rig.is-floating {
+  animation-name: pip-rig-float-hero;
+}
+
+@keyframes pip-rig-float-hero {
+  0%, 100% { transform: translateY(0) rotate(-.35deg) scale(1); }
+  50% { transform: translateY(-5px) rotate(.35deg) scale(1.008, .992); }
+}
+
+.character-life__rig-body,
+.character-life__rig-lids {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.character-life__rig-body {
+  z-index: 1;
+  object-fit: contain;
+}
+
+.character-life__rig-lids {
+  z-index: 2;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.character-life__rig-lid {
+  opacity: 0;
+  transform: scaleY(0);
+}
+
+.character-life__rig-lids.is-blinking .character-life__rig-lid {
+  opacity: 1;
+  animation: pip-rig-blink 150ms ease-in-out;
+}
+
+.character-life__rig-lid--left {
+  transform-origin: 426px 326px;
+}
+
+.character-life__rig-lid--right {
+  transform-origin: 596px 325px;
+}
+
+.character-life--pip-rig .character-life__rig-beak {
+  position: absolute;
+  z-index: 3;
+  left: 43.945%;
+  display: block;
+  width: 11.719%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.character-life--pip-rig .character-life__rig-beak--upper {
+  top: 43.164%;
+  height: 7.422%;
+}
+
+.character-life--pip-rig .character-life__rig-beak--lower {
+  top: 49.121%;
+  height: 6.934%;
+  transform-origin: 50% 0;
+}
+
+.character-life--pip-rig.is-talking .character-life__rig {
+  animation: pip-rig-speaking .4s ease-in-out infinite alternate;
+}
+
+.character-life--pip-rig.is-talking .character-life__rig-beak--lower {
+  animation: pip-rig-jaw .24s ease-in-out infinite alternate;
+}
+
+.character-life.is-floating {
+  animation: character-life-float 3.4s ease-in-out infinite;
+}
+
+.character-life__eyes {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.character-life__eyes i {
+  display: block;
+  width: 43%;
+  height: 100%;
+  border-radius: 50%;
+  background: #f4bd35;
+  border-bottom: 2px solid rgba(73, 38, 20, .72);
+  box-shadow: inset 0 -3px 5px rgba(172, 105, 16, .18);
+  transform: scaleY(0);
+  transform-origin: 50% 50%;
+  animation: character-life-blink 4.2s ease-in-out infinite;
+}
+
+.character-life__eyes i:last-child {
+  animation-delay: .025s;
+}
+
+.character-life--pip .character-life__eyes {
+  top: 29.5%;
+  left: 30.5%;
+  width: 39%;
+  height: 12.5%;
+}
+
+.character-life--egg .character-life__eyes {
+  top: 34%;
+  left: 26.5%;
+  width: 47%;
+  height: 10.5%;
+}
+
+.character-life--egg .character-life__eyes i {
+  background: #f1c432;
+}
+
+.character-life--friend .character-life__eyes,
+.character-life--friend .character-life__beak {
+  display: none;
+}
+
+.character-life__beak {
+  position: absolute;
+  z-index: 5;
+  top: 42%;
+  left: 43.5%;
+  width: 13%;
+  height: 9%;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.character-life--egg .character-life__beak {
+  top: 43.5%;
+  left: 43%;
+  width: 14%;
+  height: 7%;
+}
+
+.character-life__beak i {
+  position: absolute;
+  left: 0;
+  display: block;
+  width: 100%;
+  height: 58%;
+  border-radius: 60% 60% 42% 42%;
+  background: linear-gradient(180deg, #ffb437, #ee7b16);
+  box-shadow: inset 0 -2px 2px rgba(121, 55, 8, .24);
+}
+
+.character-life__beak i:first-child {
+  top: 0;
+  transform-origin: 50% 100%;
+}
+
+.character-life__beak i:last-child {
+  bottom: 0;
+  filter: brightness(.9);
+  transform-origin: 50% 0;
+}
+
+.character-life.is-talking .character-life__beak {
+  opacity: 1;
+}
+
+.character-life.is-talking .character-life__beak i:first-child {
+  animation: character-life-beak-top .24s ease-in-out infinite alternate;
+}
+
+.character-life.is-talking .character-life__beak i:last-child {
+  animation: character-life-beak-bottom .24s ease-in-out infinite alternate;
+}
+
+.character-life__wing {
+  position: absolute;
+  z-index: 1;
+  top: 37%;
+  width: 28%;
+  height: 21%;
+  pointer-events: none;
+}
+
+.character-life__wing--left {
+  left: -2%;
+  transform-origin: 100% 55%;
+  animation: character-life-wing-left .72s ease-in-out infinite alternate;
+}
+
+.character-life__wing--right {
+  right: -2%;
+  transform-origin: 0 55%;
+  animation: character-life-wing-right .72s ease-in-out infinite alternate;
+}
+
+.character-life__wing i {
+  position: absolute;
+  top: calc(var(--feather-index, 0) * 18%);
+  width: 82%;
+  height: 38%;
+  border-radius: 70% 30% 65% 35%;
+  background: linear-gradient(180deg, #ffd853, #eca820);
+  box-shadow: inset 0 -2px 2px rgba(149, 87, 10, .15);
+}
+
+.character-life__wing--left i { right: 0; transform: rotate(-14deg); }
+.character-life__wing--right i { left: 0; transform: scaleX(-1) rotate(-14deg); }
+.character-life__wing i:nth-child(2) { --feather-index: 1; width: 92%; }
+.character-life__wing i:nth-child(3) { --feather-index: 2; width: 74%; }
+
+.world-pip__hit .character-life__art,
+.pip-character .character-life__art {
+  animation: none;
+}
+
+.world-pip__hit .character-life__rig-body,
+.world-pip__hit .character-life__rig-beak,
+.pip-character .character-life__rig-body,
+.pip-character .character-life__rig-beak {
+  animation: none;
+}
+
+@keyframes pip-rig-blink {
+  0%, 100% { transform: scaleY(0); }
+  50% { transform: scaleY(1); }
+}
+
+@keyframes pip-rig-float {
+  0%, 100% { transform: translateY(0) rotate(-.35deg) scale(1); }
+  50% { transform: translateY(-5px) rotate(.35deg) scale(1.008, .992); }
+}
+
+@keyframes pip-rig-speaking {
+  from { transform: translateY(-1px) rotate(-.5deg); }
+  to { transform: translateY(1px) rotate(.5deg); }
+}
+
+.world-pip .character-life--pip-rig.is-talking .character-life__rig {
+  animation-name: pip-rig-speaking-hero;
+}
+
+@keyframes pip-rig-speaking-hero {
+  from { transform: translateY(-1px) rotate(-.5deg) scale(1.28); }
+  to { transform: translateY(1px) rotate(.5deg) scale(1.28); }
+}
+
+@keyframes pip-rig-jaw {
+  from { transform: translateY(1px) rotate(0); }
+  to { transform: translateY(16px) rotate(3deg); }
+}
+
+@keyframes character-life-blink {
+  0%, 88%, 94%, 100% { transform: scaleY(0); }
+  90%, 92% { transform: scaleY(1); }
+}
+
+@keyframes character-life-float {
+  0%, 100% { transform: translateY(0) rotate(-1deg); }
+  50% { transform: translateY(-12px) rotate(1deg); }
+}
+
+@keyframes character-life-wing-left {
+  from { transform: rotate(13deg) scaleY(.92); }
+  to { transform: rotate(-19deg) scaleY(1.06); }
+}
+
+@keyframes character-life-wing-right {
+  from { transform: rotate(-13deg) scaleY(.92); }
+  to { transform: rotate(19deg) scaleY(1.06); }
+}
+
+@keyframes character-life-beak-top {
+  from { transform: translateY(0) rotate(0); }
+  to { transform: translateY(-13%) rotate(-5deg); }
+}
+
+@keyframes character-life-beak-bottom {
+  from { transform: translateY(0) rotate(0); }
+  to { transform: translateY(18%) rotate(5deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .character-life.is-floating,
+  .character-life--pip-rig.is-talking .character-life__rig,
+  .character-life--pip-rig.is-talking .character-life__rig-beak--lower,
+  .character-life__rig-lid,
+  .character-life__wing,
+  .character-life__eyes i,
+  .character-life__beak i {
+    animation: none !important;
+  }
+}
