@@ -43,10 +43,12 @@ export default function TurnstileVerifier({ action, onToken, resetKey }) {
         action,
         size: 'flexible',
         appearance: 'interaction-only',
+        execution: 'execute',
         callback: (token) => onToken(token),
         'expired-callback': () => onToken(''),
         'error-callback': () => onToken(''),
       })
+      turnstile.execute(widgetIdRef.current)
     }).catch(() => onToken(''))
     return () => {
       cancelled = true
