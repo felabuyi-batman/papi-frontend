@@ -53,6 +53,63 @@ export class ChildVoiceSession {
     this.sessionId = null
     this.language = 'en'
     this.ttsAudio = null
+    this.browserSpeechRecognition = null
+    this.browserCaptureTranscript = ''
+  }
+
+  #browserSpeechRecognitionConstructor() {
+    return globalThis.SpeechRecognition || globalThis.webkitSpeechRecognition || null
+  }
+
+  #startBrowserSpeechCapture() {
+    this.browserCaptureTranscript = ''
+    const RecognitionConstructor = this.#browserSpeechRecognitionConstructor()
+    if (!RecognitionConstructor) return
+    try {
+      this.#stopBrowserSpeechCapture()
+      const recognition = new RecognitionConstructor()
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.lang = String(this.language || 'en').startsWith('en')
+        ? 'en-US'
+        : String(this.language || 'en')
+      recognition.onresult = (event) => {
+        let transcriptText = ''
+        for (let resultIndex = event.resultIndex; resultIndex < event.results.length; resultIndex += 1) {
+          transcriptText += event.results[resultIndex][0]?.transcript || ''
+        }
+        this.browserCaptureTranscript = transcriptText.trim()
+      }
+      recognition.onerror = () => {
+        /* Browser ASR is a best-effort client_transcript; Whisper remains primary. */
+      }
+      recognition.start()
+      this.browserSpeechRecognition = recognition
+    } catch {
+      this.browserSpeechRecognition = null
+    }
+  }
+
+  #stopBrowserSpeechCapture() {
+    const recognition = this.browserSpeechRecognition
+    this.browserSpeechRecognition = null
+    if (!recognition) return
+    try {
+      recognition.onresult = null
+      recognition.onerror = null
+      recognition.stop()
+    } catch {
+      try { recognition.abort() } catch { /* no-op */ }
+    }
+  }
+
+  #rememberChildTranscript(text) {
+    const transcriptText = String(text || '').trim()
+    if (!transcriptText) return
+    const lastEntry = this.transcript[this.transcript.length - 1]
+    if (lastEntry?.role === 'child' && lastEntry.text === transcriptText) return
+    this.transcript.push({ role: 'child', text: transcriptText })
+    this.emit({ type: 'child-transcript', text: transcriptText })
   }
 
   get snapshot() {
@@ -401,7 +458,10 @@ export class ChildVoiceSession {
     }
     recorder.start()
     this.childSpeaking = true
-    if (this.localTrack) this.localTrack.enabled = this.connected
+    // Always unmute for capture — fallback/tap-to-talk used to leave the track
+    // disabled when Realtime was offline, so MediaRecorder uploaded silence.
+    if (this.localTrack) this.localTrack.enabled = true
+    this.#startBrowserSpeechCapture()
     this.emitState()
     window.clearTimeout(this.captureTimer)
     this.captureTimer = window.setTimeout(() => {
@@ -416,6 +476,7 @@ export class ChildVoiceSession {
 
   async endCapture() {
     window.clearTimeout(this.captureTimer)
+    this.#stopBrowserSpeechCapture()
     const recorder = this.recorder
     if (!recorder || recorder.state !== 'recording') return null
     const stopped = new Promise((resolve) => {
@@ -431,11 +492,14 @@ export class ChildVoiceSession {
     })
     this.recorder = null
     this.captureChunks = []
+    this.#rememberChildTranscript(this.browserCaptureTranscript)
+    this.browserCaptureTranscript = ''
     return blob
   }
 
   #abortCapture() {
     window.clearTimeout(this.captureTimer)
+    this.#stopBrowserSpeechCapture()
     if (this.recorder?.state === 'recording') {
       this.recorder.onstop = null
       this.recorder.stop()
@@ -443,6 +507,16 @@ export class ChildVoiceSession {
     this.recorder = null
     this.captureChunks = []
     this.childSpeaking = false
+    this.browserCaptureTranscript = ''
+  }
+
+  latestChildTranscript() {
+    for (let index = this.transcript.length - 1; index >= 0; index -= 1) {
+      if (this.transcript[index]?.role === 'child') {
+        return this.transcript[index].text || null
+      }
+    }
+    return this.browserCaptureTranscript || null
   }
 
   getTranscript() {

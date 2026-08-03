@@ -258,19 +258,24 @@ function normalizeStartSession(payload, mode = 'drill') {
 
 function normalizeUtterance(result, { exercise, attempt = 1 } = {}) {
   const band = result.feedback_band || {}
-  const kidLine = band.kid_label
+  // Prefer SpeechC conversational coach copy. Band kid_label is a parent/analytics
+  // shorthand ("Let's try again") and was drowning out real coaching replies.
+  const kidLine = String(
+    result.ai_feedback
     || result.coach_turns?.[0]?.text
-    || result.ai_feedback
-    || 'Nice try!'
+    || band.kid_label
+    || 'Nice try!',
+  ).trim()
   const score = Number(result.accuracy_score ?? 0)
-  const hit = score >= 70 || result.exercise_complete
-  const move = result.exercise_complete
+  const exerciseComplete = Boolean(result.exercise_complete)
+  const hit = exerciseComplete || score >= 70
+  const move = exerciseComplete
     ? 'advance'
     : (attempt >= 3 ? 'advance' : (hit ? 'advance' : 'retry'))
   return {
     ...result,
     outcome: hit ? 'correct' : 'incorrect',
-    celebrate: Boolean(band.name === 'great' || score >= 85),
+    celebrate: Boolean(band.name === 'great' || score >= 85 || (exerciseComplete && score >= 55)),
     coach: {
       kid_line: kidLine,
       move,
@@ -279,7 +284,7 @@ function normalizeUtterance(result, { exercise, attempt = 1 } = {}) {
     },
     session_done: false,
     next_exercise: result.next_exercise || null,
-    exercise_complete: Boolean(result.exercise_complete),
+    exercise_complete: exerciseComplete,
     changes: result.next_exercise ? { next_prompt: result.next_exercise.expected_text } : {},
     current_exercise: exercise,
   }

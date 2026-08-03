@@ -23,7 +23,7 @@ test('routes every backend recommendation without duplicating clinical decisions
   assert.equal(stageForSession({ recommendedMode: 'math', session: {} }), 'math')
 })
 
-test('maps all eight ladder levels to their child interaction', () => {
+test('maps SpeechC ladder levels to their child interaction', () => {
   const stageAt = (ladderLevel, practiceMode = 'drill') => stageForSession({
     recommendedMode: 'drill',
     session: {
@@ -35,11 +35,13 @@ test('maps all eight ladder levels to their child interaction', () => {
   assert.equal(stageAt(0, 'model_imitate'), 'model_imitate')
   assert.equal(stageAt(1, 'model_imitate'), 'model_imitate')
   assert.equal(stageAt(2), 'word_naming')
-  assert.equal(stageAt(3), 'word_naming')
-  assert.equal(stageAt(4), 'word_naming')
-  assert.equal(stageAt(5), 'phrase')
-  assert.equal(stageAt(6), 'sentence')
-  assert.equal(stageAt(7), 'conversation')
+  assert.equal(stageAt(3), 'phrase')
+  assert.equal(stageAt(4), 'sentence')
+  assert.equal(stageAt(5), 'conversation')
+  assert.equal(
+    stageForSession({ recommendedMode: 'conversation', session: { target: { ladder_level: 0 } } }),
+    'conversation',
+  )
 })
 
 test('state machine follows one bounded turn and rejects stuck transitions', () => {

@@ -28,7 +28,11 @@ const ALLOWED = {
     SESSION_PHASES.listening,
     SESSION_PHASES.recoverableError,
   ],
-  [SESSION_PHASES.modeling]: [SESSION_PHASES.ready, SESSION_PHASES.recoverableError],
+  [SESSION_PHASES.modeling]: [
+    SESSION_PHASES.ready,
+    SESSION_PHASES.listening,
+    SESSION_PHASES.recoverableError,
+  ],
   [SESSION_PHASES.ready]: [
     SESSION_PHASES.modeling,
     SESSION_PHASES.listening,
@@ -49,6 +53,7 @@ const ALLOWED = {
     SESSION_PHASES.reward,
     SESSION_PHASES.modeling,
     SESSION_PHASES.ready,
+    SESSION_PHASES.listening,
     SESSION_PHASES.complete,
     SESSION_PHASES.recoverableError,
   ],
@@ -59,6 +64,7 @@ const ALLOWED = {
   ],
   [SESSION_PHASES.reward]: [
     SESSION_PHASES.ready,
+    SESSION_PHASES.listening,
     SESSION_PHASES.complete,
     SESSION_PHASES.recoverableError,
   ],
@@ -125,17 +131,20 @@ export function stageForSession({ recommendedMode, session }) {
   if (recommendedMode === 'math') return 'math'
   if (recommendedMode === 'pairs' || session?.mode === 'pairs') return 'pairs'
   if (recommendedMode === 'live') return 'live'
-
-  const ladderLevel = session?.target?.ladder_level ?? 0
-  const practiceMode = session?.practice_mode
-  if (practiceMode === 'model_imitate' || ladderLevel <= 1) return 'model_imitate'
-  if (ladderLevel <= 4) return 'word_naming'
-  if (ladderLevel === 5) return 'phrase'
-  if (ladderLevel === 6) return 'sentence'
+  // Honor SpeechC conversation recommendation before ladder drill gates.
   if (recommendedMode === 'conversation' || session?.mode === 'conversation') {
     return 'conversation'
   }
-  return 'conversation'
+
+  // Backend ladder: isolation=0, syllable=1, word=2, phrase=3, sentence=4, conversation=5
+  const ladderLevel = session?.target?.ladder_level ?? 0
+  const practiceMode = session?.practice_mode
+  if (practiceMode === 'model_imitate' || ladderLevel <= 1) return 'model_imitate'
+  if (ladderLevel === 2) return 'word_naming'
+  if (ladderLevel === 3) return 'phrase'
+  if (ladderLevel === 4) return 'sentence'
+  if (ladderLevel >= 5) return 'conversation'
+  return 'word_naming'
 }
 
 export function childSafeFeedback(result, word) {

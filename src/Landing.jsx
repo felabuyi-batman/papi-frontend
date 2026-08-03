@@ -8,6 +8,7 @@ import {
 import AnimatedCharacterArt from './AnimatedCharacterArt.jsx'
 import { api } from './api.js'
 import { pipVoiceBridge, DEMO_SESSION_LIMIT, DEMO_SESSION_STORAGE_KEY } from './voice/PipVoiceBridge.js'
+import PinnedProofChapter from './landing/PinnedProofChapter.jsx'
 import './landing.css'
 
 /**
@@ -341,11 +342,17 @@ function EarlyAccessControl({
       <button
         type="button"
         className={buttonClassName}
+        aria-label={buttonLabel}
         aria-expanded={isOpen}
         aria-controls="early-access-panel"
         onClick={() => onOpenChange(!isOpen)}
       >
-        {buttonLabel}
+        <span className="chirp-nav__earlyBtnLabel chirp-nav__earlyBtnLabel--full" aria-hidden="true">
+          {buttonLabel}
+        </span>
+        <span className="chirp-nav__earlyBtnLabel chirp-nav__earlyBtnLabel--short" aria-hidden="true">
+          Join
+        </span>
       </button>
       {isOpen && (
         <div
@@ -518,7 +525,6 @@ function WorldPip({
           flapping
         />
         <StarBurst burstId={pokeBurstCount} />
-        {(isListening || isScoring || isModeling) && <span className="world-pip__ring" aria-hidden="true" />}
       </button>
       {triesCount > 0 && (
         <p className="world-pip__score" aria-live="polite">
@@ -734,34 +740,12 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
         </div>
       </section>
 
-      <section className="room room--proof" id="proof" aria-labelledby="proof-heading">
-        <div className="room__inner room__inner--proof">
-          <div className="proof-copy">
-            <h2 id="proof-heading">
-              Progress you
-              <em> can prove</em>
-            </h2>
-            <p className="proof-line">
-              Pipa re-tests on words your child never practiced - so the progress you see is real
-              speech change, not memorization.
-            </p>
-          </div>
-          <div className={`proof-dial ${triesCount > 0 ? 'has-score' : ''}`} aria-live="polite">
-            <img className="proof-dial__sun" src="/characters/prop-sun.webp" alt="" />
-            <p className="proof-dial__score">
-              {triesCount === 0 ? '?' : scoreOutOfTen}
-              <span>in 10</span>
-            </p>
-            {triesCount === 0 ? (
-              <p className="proof-dial__hint">Scroll up, tap Pipa, and talk. Your play score shows up here.</p>
-            ) : (
-              <p className="proof-dial__hint">
-                Live from Pipa · {hitsCount} clear of {triesCount} · {berryCount} berries
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
+      <PinnedProofChapter
+        scoreOutOfTen={scoreOutOfTen}
+        triesCount={triesCount}
+        hitsCount={hitsCount}
+        berryCount={berryCount}
+      />
 
       <section className="room room--dose" id="dose" aria-labelledby="dose-heading">
         <div className="room__inner room__inner--dose">

@@ -288,13 +288,16 @@ async function openChildExperience(page, stage) {
 
 const stages = [
   { recommendedMode: 'drill', ladderLevel: 0, label: 'Copy Pip' },
-  { recommendedMode: 'drill', ladderLevel: 3, label: 'Picture Meadow' },
+  { recommendedMode: 'drill', ladderLevel: 2, label: 'Picture Meadow' },
   { recommendedMode: 'pairs', ladderLevel: 3, label: 'Sound Detective' },
-  { recommendedMode: 'conversation', ladderLevel: 5, label: 'Tiny Story' },
-  { recommendedMode: 'conversation', ladderLevel: 6, label: 'Story Flight' },
-  { recommendedMode: 'conversation', ladderLevel: 7, label: 'Pip Chat' },
-  { recommendedMode: 'live', ladderLevel: 7, label: 'Live with Pip' },
+  { recommendedMode: 'drill', ladderLevel: 3, label: 'Tiny Story' },
+  { recommendedMode: 'drill', ladderLevel: 4, label: 'Story Flight' },
+  { recommendedMode: 'conversation', ladderLevel: 5, label: 'Pip Chat' },
+  { recommendedMode: 'live', ladderLevel: 5, label: 'Live with Pip' },
 ]
+
+const talkButton = (page) => page.getByRole('button', { name: /talk with pip|tap to talk/i })
+const doneButton = (page) => page.getByRole('button', { name: /I’m done/i })
 
 for (const stage of stages) {
   test(`${stage.label} opens from the backend recommendation`, async ({ page }) => {
@@ -340,20 +343,26 @@ test('reduced-motion children keep the full interaction without ambient loops', 
   )
   expect(motion.reduced).toBe(true)
   expect(motion.duration).toBeLessThanOrEqual(0.1)
-  await expect(page.getByRole('button', { name: /tap to talk/i })).toBeEnabled()
+  // Auto-listen may already be open; either control means the turn path is alive.
+  await expect(talkButton(page).or(doneButton(page))).toBeVisible()
 })
 
 test('a fallback microphone turn records once, scores, and advances', async ({ page }) => {
   await openChildExperience(page, stages[1])
-  await page.getByRole('button', { name: /tap to talk/i }).click()
-  await expect(page.getByRole('button', { name: /I’m done/i })).toBeVisible()
   const scoringRequest = page.waitForRequest(
     (request) => request.url().includes('/utterance'),
+    { timeout: 15000 },
   )
-  await page.getByRole('button', { name: /I’m done/i }).click()
+  // Auto-listen may already be open; otherwise start a tap turn.
+  if (!(await doneButton(page).isVisible().catch(() => false))) {
+    await talkButton(page).click()
+  }
+  await expect(doneButton(page)).toBeVisible()
+  await doneButton(page).click()
   await scoringRequest
-  await expect(page.getByLabel('Berry basket: 1 of 10')).toBeVisible()
-  await expect(page.getByRole('button', { name: /tap to talk/i })).toBeEnabled()
+  await expect(page.getByLabel('Berry basket: 1 of 10')).toBeVisible({ timeout: 10000 })
+  // Next listen window should auto-open after coaching (force beginChildTurn).
+  await expect(talkButton(page).or(doneButton(page))).toBeVisible({ timeout: 10000 })
 })
 
 test('one screener tap automatically finalizes and submits the child turn', async ({ page }) => {
