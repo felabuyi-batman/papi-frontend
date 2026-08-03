@@ -194,19 +194,25 @@ export function ParentAuth({ onDone, onBack }) {
       onBrandClick={onBack}
       topRight={<NestBack onClick={onBack}>Back to play</NestBack>}
       pageClassName="nest--auth"
+      companion={false}
     >
       <div className="nest-auth__intro">
-        <p className="nest__kicker">The grown-up nest</p>
-        <h1 className="nest__title">{isSignup ? 'Create a calmer practice rhythm.' : 'Open your nest.'}</h1>
-        <p className="nest__lede">
-          {isSignup
-            ? 'Set up a private place for practice plans, recommendations, and every small win.'
-            : 'See what is clicking, what needs support, and the best next activity for your child.'}
-        </p>
+        <div className="nest-auth__story">
+          <p className="nest__kicker">The grown-up nest</p>
+          <h1 className="nest__title">{isSignup ? 'Create a calmer practice rhythm.' : 'Open your nest.'}</h1>
+          <p className="nest__lede">
+            {isSignup
+              ? 'Set up one private place for practice plans, recommendations, and every small win.'
+              : 'See what is clicking, what needs support, and the best next activity for your child.'}
+          </p>
+        </div>
+        <div className="nest-auth__portrait" aria-hidden="true">
+          <AnimatedCharacterArt variant="pip" alt="" floating />
+        </div>
         <dl className="nest-auth__trust" aria-label="What parents can do in the nest">
-          <div><dt>Progress</dt><dd>Clear, child-friendly trends</dd></div>
-          <div><dt>Next steps</dt><dd>Personalized recommendations</dd></div>
-          <div><dt>Privacy</dt><dd>Voice discarded by default</dd></div>
+          <div><dt>01</dt><dd><strong>See the pattern</strong><span>Progress without clinical clutter</span></dd></div>
+          <div><dt>02</dt><dd><strong>Know what is next</strong><span>Recommendations shaped by practice</span></dd></div>
+          <div><dt>03</dt><dd><strong>Stay in control</strong><span>Private by design, always parent-led</span></dd></div>
         </dl>
       </div>
 
