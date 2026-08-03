@@ -44,6 +44,20 @@ test('fallback capture unmutes the microphone track', () => {
   assert.match(voiceSource, /latestChildTranscript/)
 })
 
+test('OpenAI Realtime text is rendered by ElevenLabs with child barge-in', () => {
+  const voiceSource = readSrc('src/voice/ChildVoiceSession.js')
+  assert.match(voiceSource, /response\.output_text\.delta/)
+  assert.match(voiceSource, /#speakWithCoachTts\(completedText\)/)
+  assert.match(voiceSource, /this\.#interruptCoachSpeech\(\)/)
+  assert.match(voiceSource, /type: 'response\.cancel'/)
+  const speakBlock = voiceSource.slice(
+    voiceSource.indexOf('async speak(text)'),
+    voiceSource.indexOf('setHandsFree(enabled)'),
+  )
+  assert.match(speakBlock, /return this\.#speakWithCoachTts\(line\)/)
+  assert.doesNotMatch(speakBlock, /output_modalities: \['audio'\]/)
+})
+
 test('conversation recommendation is not flattened into drill stages', () => {
   assert.equal(
     stageForSession({

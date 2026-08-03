@@ -53,6 +53,8 @@ export class ChildVoiceSession {
     this.sessionId = null
     this.language = 'en'
     this.ttsAudio = null
+    this.ttsPlaybackToken = 0
+    this.pendingResponseText = ''
     this.browserSpeechRecognition = null
     this.browserCaptureTranscript = ''
   }
@@ -244,9 +246,11 @@ export class ChildVoiceSession {
             },
             turn_detection: {
               type: 'server_vad',
-              threshold: 0.5,
-              prefix_padding_ms: 300,
-              silence_duration_ms: 650,
+              threshold: 0.65,
+              prefix_padding_ms: 400,
+              // Children pause mid-thought more than adults; wait long enough
+              // to avoid cutting them off without making the turn feel sluggish.
+              silence_duration_ms: 900,
               create_response: Boolean(automaticResponses),
               interrupt_response: true,
             },
@@ -259,8 +263,10 @@ export class ChildVoiceSession {
   }
 
   async #speakWithCoachTts(text) {
+    const playbackToken = ++this.ttsPlaybackToken
     try {
       const blob = await this.api.coachTts(text, { language: this.language })
+      if (playbackToken !== this.ttsPlaybackToken) return { ok: false, interrupted: true }
       const url = URL.createObjectURL(blob)
       await new Promise((resolve) => {
         try { this.ttsAudio?.pause() } catch { /* no-op */ }
@@ -268,9 +274,16 @@ export class ChildVoiceSession {
         this.ttsAudio = audio
         this.speaking = true
         this.emitState()
+        let finished = false
         const finish = () => {
-          this.speaking = false
-          this.emitState()
+          if (finished) return
+          finished = true
+          if (playbackToken === this.ttsPlaybackToken) {
+            this.ttsAudio = null
+            this.speaking = false
+            if (this.localTrack) this.localTrack.enabled = this.handsFree
+            this.emitState()
+          }
           URL.revokeObjectURL(url)
           resolve({ ok: true, fallback: 'coach_tts' })
         }
@@ -283,6 +296,19 @@ export class ChildVoiceSession {
       await FALLBACK_SPEAK(text)
       return { ok: true, fallback: true }
     }
+  }
+
+  #interruptCoachSpeech() {
+    this.ttsPlaybackToken += 1
+    try { this.ttsAudio?.pause() } catch { /* no-op */ }
+    this.ttsAudio = null
+    window.speechSynthesis?.cancel()
+    if (this.speaking) {
+      this.speaking = false
+      this.emit({ type: 'pip-interrupted' })
+    }
+    if (this.localTrack) this.localTrack.enabled = this.handsFree
+    this.emitState()
   }
 
   async #ensureMicrophone() {
@@ -307,6 +333,20 @@ export class ChildVoiceSession {
       return
     }
 
+    if (payload.type === 'response.created') {
+      this.pendingResponseText = ''
+    }
+    if (
+      payload.type === 'response.output_text.delta'
+      || payload.type === 'response.text.delta'
+    ) {
+      const delta = String(payload.delta || '')
+      this.pendingResponseText += delta
+      this.emit({ type: 'pip-transcript-delta', text: delta })
+    }
+    if (payload.type === 'response.output_text.done' && payload.text) {
+      this.pendingResponseText = String(payload.text)
+    }
     if (
       payload.type === 'response.output_audio_transcript.delta'
       || payload.type === 'response.audio_transcript.delta'
@@ -336,7 +376,6 @@ export class ChildVoiceSession {
     }
     if (
       payload.type === 'output_audio_buffer.stopped'
-      || payload.type === 'response.done'
       || payload.type === 'response.cancelled'
     ) {
       this.speaking = false
@@ -346,6 +385,10 @@ export class ChildVoiceSession {
       this.emitState()
     }
     if (payload.type === 'input_audio_buffer.speech_started' && this.handsFree) {
+      // A child always wins the floor. Stop ElevenLabs immediately and cancel
+      // any OpenAI text generation still in flight before recording the turn.
+      this.#interruptCoachSpeech()
+      this.#send({ type: 'response.cancel' })
       this.childSpeaking = true
       this.beginCapture({ maxMs: 5000 }).catch(() => {})
       this.emitState()
@@ -360,6 +403,24 @@ export class ChildVoiceSession {
     if (payload.type === 'error') {
       const message = payload.error?.message || 'Pip’s voice hiccuped.'
       this.emit({ type: 'recoverable-error', message })
+    }
+    if (payload.type === 'response.done') {
+      const responseContent = (payload.response?.output || [])
+        .flatMap((item) => item.content || [])
+      const completedText = String(
+        this.pendingResponseText
+        || responseContent.find((content) => content.text || content.transcript)?.text
+        || responseContent.find((content) => content.transcript)?.transcript
+        || '',
+      ).trim()
+      this.pendingResponseText = ''
+      for (const resolve of this.responseWaiters) resolve(payload)
+      this.responseWaiters.clear()
+      if (completedText) {
+        this.transcript.push({ role: 'pip', text: completedText })
+        this.emit({ type: 'pip-transcript', text: completedText })
+        this.#speakWithCoachTts(completedText).catch(() => {})
+      }
     }
     if (
       payload.type === 'response.function_call_arguments.done'
@@ -401,41 +462,15 @@ export class ChildVoiceSession {
     const line = String(text || '').trim()
     if (!line) return { ok: true }
     this.transcript.push({ role: 'pip', text: line })
-    if (!this.connected || !this.#send({
-      type: 'response.create',
-      response: {
-        output_modalities: ['audio'],
-        instructions:
-          `Speak this aloud to a young child in your warm Pip voice. `
-          + `Use one short turn, then stop and wait.\n\n${line}`,
-      },
-    })) {
-      return this.#speakWithCoachTts(line)
-    }
-
-    if (this.localTrack) this.localTrack.enabled = false
-    this.speaking = true
-    this.emitState()
-    return new Promise((resolve) => {
-      let settled = false
-      const finish = (payload) => {
-        if (settled) return
-        settled = true
-        this.responseWaiters.delete(finish)
-        this.speaking = false
-        if (this.localTrack) this.localTrack.enabled = this.handsFree
-        this.emitState()
-        resolve({ ok: true, payload })
-      }
-      this.responseWaiters.add(finish)
-      window.setTimeout(() => finish({ type: 'timeout' }), 14000)
-    })
+    // OpenAI owns listening, reasoning and turn detection. ElevenLabs is the
+    // primary and only requested voice renderer; browser speech is fallback.
+    return this.#speakWithCoachTts(line)
   }
 
   setHandsFree(enabled) {
     this.handsFree = Boolean(enabled && this.connected)
     if (this.localTrack) {
-      this.localTrack.enabled = this.handsFree && !this.speaking
+      this.localTrack.enabled = this.handsFree
     }
     if (!this.handsFree) this.#abortCapture()
     this.emitState()
@@ -485,7 +520,7 @@ export class ChildVoiceSession {
     recorder.stop()
     await stopped
     this.childSpeaking = false
-    if (this.localTrack) this.localTrack.enabled = this.handsFree && !this.speaking
+    if (this.localTrack) this.localTrack.enabled = this.handsFree
     this.emitState()
     const blob = new Blob(this.captureChunks, {
       type: recorder.mimeType || 'audio/webm',
@@ -528,6 +563,7 @@ export class ChildVoiceSession {
     this.#abortCapture()
     window.speechSynthesis?.cancel()
     try { this.ttsAudio?.pause() } catch { /* no-op */ }
+    this.ttsPlaybackToken += 1
     this.ttsAudio = null
     for (const resolve of this.responseWaiters) resolve({ type: 'cancelled' })
     this.responseWaiters.clear()
