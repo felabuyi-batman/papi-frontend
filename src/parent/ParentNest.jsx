@@ -114,7 +114,7 @@ export function ParentAuth({ onDone, onBack }) {
       const online = await api.health()
       setApiOnline(online)
       if (!online) {
-        throw new Error('Pip’s nest is offline. Keep this tab open - we’re retrying the API.')
+        throw new Error('Pipa’s secure service is taking a short pause. Please try again in a moment.')
       }
       if (!turnstileSiteKey() || !turnstileToken) {
         throw new Error('Complete the Cloudflare security check, then try again.')
@@ -255,7 +255,7 @@ export function ParentAuth({ onDone, onBack }) {
 
         {apiOnline === false && (
           <p className="nest__error">
-            Nest offline. Run <code>npm run dev</code> in chirp-frontend.
+            Pipa’s secure service is taking a short pause. Please try again in a moment.
           </p>
         )}
         {err && <p className="nest__error">{err}</p>}

@@ -576,8 +576,7 @@
   background: #fffdf8;
 }
 
-.nest__turnstile { min-height: 68px; display: grid; place-items: center; }
-.nest__turnstile iframe { max-width: 100%; }
+.nest__turnstile { position: absolute; width: 1px; height: 1px; overflow: hidden; }
 
 .nest-dashboard { width: min(1120px, 100%); margin-inline: auto; display: grid; gap: 22px; }
 .nest-dashboard__hero { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 32px; align-items: end; }

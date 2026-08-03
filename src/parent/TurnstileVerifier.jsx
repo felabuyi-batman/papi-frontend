@@ -41,9 +41,7 @@ export default function TurnstileVerifier({ action, onToken, resetKey }) {
       widgetIdRef.current = turnstile.render(containerRef.current, {
         sitekey: siteKey,
         action,
-        appearance: 'interaction-only',
-        size: 'flexible',
-        theme: 'light',
+        size: 'invisible',
         callback: (token) => onToken(token),
         'expired-callback': () => onToken(''),
         'error-callback': () => onToken(''),
@@ -67,9 +65,6 @@ export default function TurnstileVerifier({ action, onToken, resetKey }) {
   }
 
   return (
-    <div className="nest__turnstile" aria-label="Cloudflare security verification">
-      <div ref={containerRef} />
-      <span>Protected by Cloudflare Turnstile</span>
-    </div>
+    <div className="nest__turnstile" aria-hidden="true" ref={containerRef} />
   )
 }

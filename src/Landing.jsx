@@ -195,7 +195,7 @@ function StarBurst({ burstId }) {
 
 function PipaWordmark({ className }) {
   return (
-    <a href="#top" className={className} aria-label="Pipa, back to top">
+    <a href="#top" className={className}>
       <span aria-hidden="true">p</span>
       pipa!
     </a>
@@ -342,7 +342,7 @@ function EarlyAccessControl({
       <button
         type="button"
         className={buttonClassName}
-        aria-label={buttonLabel}
+        aria-label={`${buttonLabel}. Join`}
         aria-expanded={isOpen}
         aria-controls="early-access-panel"
         onClick={() => onOpenChange(!isOpen)}
@@ -388,7 +388,6 @@ function WorldAtmosphere({ scrollYProgress, isBlooming, berryCount, onToyInterac
   )
   const hillY = useTransform(scrollYProgress, [0, 0.45], ['0%', '12%'])
   const sunX = useTransform(scrollYProgress, [0, 0.5], ['0%', '18%'])
-  const rainbowOpacity = useTransform(scrollYProgress, [0, 0.08, 0.16], [1, 0.55, 0])
 
   function pokeToy(toyId) {
     setToyPulse(toyId)
@@ -410,16 +409,15 @@ function WorldAtmosphere({ scrollYProgress, isBlooming, berryCount, onToyInterac
         onClick={() => pokeToy('sun')}
         style={prefersReducedMotion ? undefined : { x: sunX }}
       >
-        <img src="/characters/prop-sun.webp" alt="" />
+        <img src="/characters/prop-sun.webp" alt="" width="893" height="892" />
       </motion.button>
       <motion.button
         type="button"
         className={`world-atmosphere__rainbow ${toyPulse === 'rainbow' ? 'is-poked' : ''}`}
         aria-label="Poke the rainbow"
         onClick={() => pokeToy('rainbow')}
-        style={prefersReducedMotion ? undefined : { opacity: rainbowOpacity }}
       >
-        <img src="/characters/prop-rainbow.webp" alt="" />
+        <img src="/characters/prop-rainbow.webp" alt="" width="900" height="525" />
       </motion.button>
       <img
         className="world-atmosphere__cloud world-atmosphere__cloud--a"
@@ -759,7 +757,7 @@ function ParentChapters({ scoreOutOfTen, triesCount, hitsCount, berryCount }) {
               cliffhanger, not a tantrum.
             </p>
           </div>
-          <img className="dose-prop" src="/characters/prop-rainbow.webp" alt="" />
+          <img className="dose-prop" src="/characters/prop-rainbow.webp" alt="" width="900" height="525" />
           <ul className="dose-mega">
             <li>
               <strong>30</strong>
@@ -972,7 +970,6 @@ export default function Landing({ onGrownUps, onTryDemo, onSlp }) {
   }
 
   useEffect(() => {
-    pipVoiceBridge.ensureConnected().catch(() => {})
     return () => pipVoiceBridge.disconnect()
   }, [])
 

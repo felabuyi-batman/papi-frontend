@@ -43,6 +43,16 @@ const CHARACTER_EYELID_LAYOUTS = {
   },
 }
 
+const CHARACTER_IMAGE_DIMENSIONS = {
+  '/characters/friend-lulu-lion.webp': { width: 607, height: 830 },
+  '/characters/friend-rory-rocket.webp': { width: 549, height: 860 },
+  '/characters/friend-stella-star.webp': { width: 782, height: 833 },
+  '/characters/friend-theo-thunder.webp': { width: 827, height: 721 },
+  '/characters/pip-hop.webp': { width: 673, height: 780 },
+  '/characters/pip-star.webp': { width: 632, height: 764 },
+  '/characters/prop-hatching-egg.webp': { width: 553, height: 822 },
+}
+
 function resolveCharacterSourcePath(src = '') {
   if (!src) return ''
   try {
@@ -218,6 +228,9 @@ function RiggedPipCharacter({ alt, talking, floating, className, onAnimationEnd 
           className="character-life__rig-body"
           src="/characters/pip-rig-body.png?v=talking-3"
           alt={alt}
+          width="1024"
+          height="1024"
+          fetchPriority="high"
         />
         <svg
           className={`character-life__rig-lids ${isBlinking ? 'is-blinking' : ''}`}
@@ -260,12 +273,16 @@ function RiggedPipCharacter({ alt, talking, floating, className, onAnimationEnd 
           className="character-life__rig-beak character-life__rig-beak--upper"
           src="/characters/pip-rig-beak-upper.png?v=talking-3"
           alt=""
+          width="120"
+          height="76"
         />
         <img
           ref={beakLowerRef}
           className="character-life__rig-beak character-life__rig-beak--lower"
           src="/characters/pip-rig-beak-lower.png?v=talking-3"
           alt=""
+          width="120"
+          height="71"
         />
       </span>
     </span>
@@ -347,7 +364,7 @@ function BlinkingArtworkCharacter({
       className={['character-life', variantClassName, className].filter(Boolean).join(' ')}
       onAnimationEnd={onAnimationEnd}
     >
-      <img className="character-life__art" src={src} alt={alt} />
+      <img className="character-life__art" src={src} alt={alt} {...CHARACTER_IMAGE_DIMENSIONS[src]} />
       <svg
         className="character-life__lids"
         viewBox={eyelidLayout.viewBox}
@@ -429,7 +446,7 @@ export default function AnimatedCharacterArt({
       className={['character-life', variantClassName, className].filter(Boolean).join(' ')}
       onAnimationEnd={onAnimationEnd}
     >
-      <img className="character-life__art" src={src} alt={alt} />
+      <img className="character-life__art" src={src} alt={alt} {...CHARACTER_IMAGE_DIMENSIONS[src]} />
     </span>
   )
 }

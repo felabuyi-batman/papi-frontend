@@ -1,0 +1,14 @@
+# Pipa
+
+Pipa is a multilingual, voice-first learning companion for children. It supports playful speech and mathematics practice, with private progress insights and recommendations for parents.
+
+## Canonical site
+
+- https://www.hellopipa.world/
+
+## Product areas
+
+- Child experience: hands-free conversational learning and practice
+- Parent nest: progress, recommendations, account, and subscription management
+- Privacy and safety: https://www.hellopipa.world/privacy
+- Terms: https://www.hellopipa.world/terms

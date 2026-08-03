@@ -86,7 +86,7 @@ export async function acceptSupabaseSession() {
 function friendlyNetworkError(error) {
   const message = String(error?.message || error || '')
   if (/failed to fetch|networkerror|load failed|network request failed/i.test(message)) {
-    return 'Pipa’s nest is offline. Start the API (npm run dev in chirp-frontend), then try again.'
+    return 'Pipa’s secure service is taking a short pause. Please try again in a moment.'
   }
   return message || 'Something went wrong.'
 }
