@@ -4,6 +4,7 @@ import { ChildVoiceSession } from '../voice/ChildVoiceSession.js'
 import Character from './Character.jsx'
 import { Confetti } from './GameBits.jsx'
 import World from './World.jsx'
+import { childCopy, languageDirection } from './i18n.js'
 import './child-world.css'
 
 function QuantityDots({ count }) {
@@ -18,15 +19,19 @@ function QuantityDots({ count }) {
 }
 
 export default function MathSession({ child, engagement, onExit }) {
+  const language = child.language || engagement?.language || 'en'
+  const copy = childCopy(language)
   const [session, setSession] = useState(null)
   const [exercise, setExercise] = useState(null)
-  const [message, setMessage] = useState('Pip is counting berries…')
+  const [message, setMessage] = useState(copy.thinking)
   const [phase, setPhase] = useState('loading')
   const [confetti, setConfetti] = useState(0)
   const [error, setError] = useState(null)
   const [voiceState, setVoiceState] = useState({})
   const voiceRef = useRef(new ChildVoiceSession(api))
-  const submitRef = useRef(null)
+  const processTurnRef = useRef(null)
+  const listeningRestartRef = useRef(null)
+  const turnInFlightRef = useRef(false)
 
   useEffect(() => {
     let cancelled = false
@@ -34,7 +39,7 @@ export default function MathSession({ child, engagement, onExit }) {
     const unsubscribe = voice.subscribe((event) => {
       if (event.type === 'state') setVoiceState(event.state)
       if (event.type === 'utterance') {
-        // Spoken math path — send transcript hint via empty attempt after capture.
+        processTurnRef.current?.(event.blob)
       }
     })
     ;(async () => {
@@ -45,16 +50,11 @@ export default function MathSession({ child, engagement, onExit }) {
         setExercise(payload.exercise)
         const opening = payload.episode?.cold_open
           || payload.ui?.welcome
-          || `Hi ${child.display_name}! Let’s count with Pip.`
+          || copy.countOpening(child.display_name)
         setMessage(opening)
         setPhase('ready')
-        voice.connect({
-          childId: child.id,
-          sessionId: payload.session_id,
-          mode: 'practice',
-          language: child.language || engagement?.language || 'en',
-        }).catch(() => {})
         await voice.speak(opening)
+        if (!cancelled) listeningRestartRef.current?.()
       } catch (requestError) {
         if (!cancelled) setError(requestError.message)
       }
@@ -64,13 +64,27 @@ export default function MathSession({ child, engagement, onExit }) {
       unsubscribe()
       voice.disconnect()
     }
-  }, [child.display_name, child.id, child.language, engagement?.language])
+  }, [child.display_name, child.id, copy, language])
+
+  async function startListening() {
+    if (!session?.session_id || turnInFlightRef.current) return
+    try {
+      setError(null)
+      setPhase('listening')
+      setMessage(copy.listening)
+      await voiceRef.current.beginCapture({ maxMs: 5200 })
+    } catch {
+      setError(copy.reconnecting)
+      window.setTimeout(() => listeningRestartRef.current?.(), 1200)
+    }
+  }
+  listeningRestartRef.current = startListening
 
   async function applyResult(result) {
     const kidLine = result.feedback_band?.kid_label
       || result.message
       || result.coach_line
-      || (result.correct ? 'Berry bright counting!' : 'Let’s count once more.')
+      || (result.correct ? copy.countWin : copy.countAgain)
     setMessage(kidLine)
     await voiceRef.current.speak(kidLine)
     if (result.correct || result.ok) {
@@ -78,12 +92,12 @@ export default function MathSession({ child, engagement, onExit }) {
     }
     if (result.next_exercise || result.exercise) {
       setExercise(result.next_exercise || result.exercise)
-      setPhase('ready')
+      setPhase('listening')
       return
     }
     if (result.kind === 'topic_jump' && result.exercise) {
       setExercise(result.exercise)
-      setPhase('ready')
+      setPhase('listening')
     }
   }
 
@@ -96,44 +110,31 @@ export default function MathSession({ child, engagement, onExit }) {
     } catch (requestError) {
       setError(requestError.message)
       setPhase('ready')
+    } finally {
+      window.setTimeout(() => listeningRestartRef.current?.(), 250)
     }
   }
 
-  async function handleMicrophone() {
-    if (error) {
-      setError(null)
-      setPhase('ready')
-      return
-    }
-    if (voiceState.childSpeaking) {
-      const blob = await voiceRef.current.endCapture()
-      if (!blob?.size) {
-        setError('Pip didn’t catch that. Tap and try again.')
-        return
-      }
-      setPhase('scoring')
-      try {
-        // Prefer spoken number path; transcript may be empty without realtime.
-        const result = await api.mathUtterance(
-          session.session_id,
-          String(exercise?.answer ?? ''),
-        )
-        await applyResult(result)
-      } catch (requestError) {
-        setError(requestError.message)
-        setPhase('ready')
-      }
-      return
-    }
+  async function processSpokenTurn(blob) {
+    if (!blob?.size || !session?.session_id || turnInFlightRef.current) return
+    turnInFlightRef.current = true
+    setPhase('scoring')
+    setMessage(copy.thinking)
     try {
-      setPhase('listening')
-      setMessage('I’m listening for your number…')
-      await voiceRef.current.beginCapture({ maxMs: 4000 })
-    } catch {
-      setError('A grown-up can check the microphone, then tap Try again.')
+      const result = await api.mathAudioUtterance(
+        session.session_id,
+        blob,
+        voiceRef.current.latestChildTranscript(),
+      )
+      await applyResult(result)
+    } catch (requestError) {
+      setError(requestError.message)
+    } finally {
+      turnInFlightRef.current = false
+      window.setTimeout(() => listeningRestartRef.current?.(), 250)
     }
   }
-  submitRef.current = handleMicrophone
+  processTurnRef.current = processSpokenTurn
 
   const choices = exercise?.choices || (
     exercise?.answer != null
@@ -144,13 +145,13 @@ export default function MathSession({ child, engagement, onExit }) {
   )
 
   return (
-    <div className="syllabus-world syllabus-world--math">
+    <div className="syllabus-world syllabus-world--math" lang={language} dir={languageDirection(language)}>
       <World world={engagement?.world || { id: 'meadow', unlocked: ['meadow'] }} warmth={0.8} />
       <Confetti burst={confetti} />
       <header className="syllabus-header">
-        <button type="button" className="syllabus-back" onClick={onExit} aria-label="Back">←</button>
+        <button type="button" className="syllabus-back" onClick={onExit} aria-label={copy.back}>←</button>
         <div className="syllabus-brand"><span>p</span> pipa</div>
-        <div className="syllabus-chip">Number nest</div>
+        <div className="syllabus-chip">{copy.numberNest}</div>
       </header>
 
       <main className="syllabus-playground">
@@ -170,10 +171,10 @@ export default function MathSession({ child, engagement, onExit }) {
         </section>
 
         <section className="syllabus-challenge">
-          <p className="syllabus-kicker">NUMBER NEST</p>
-          <h1>{exercise?.prompt || 'How many berries?'}</h1>
+          <p className="syllabus-kicker">{copy.numberKicker}</p>
+          <h1>{exercise?.prompt || copy.defaultMathPrompt}</h1>
           <div className="syllabus-bubble" aria-live="polite">
-            <span>PIP SAYS</span>
+            <span>{copy.coachSays}</span>
             {error || message}
           </div>
 
@@ -202,16 +203,12 @@ export default function MathSession({ child, engagement, onExit }) {
           )}
 
           <div className="syllabus-controls">
-            <button
-              type="button"
-              className={`syllabus-mic ${phase === 'listening' ? 'is-listening' : ''}`}
-              onClick={handleMicrophone}
-              disabled={phase === 'loading' || phase === 'scoring'}
-            >
-              {phase === 'listening' ? 'I’m done' : 'Speak the number'}
-            </button>
+            <div className={`hands-free-orb ${phase === 'listening' ? 'is-listening' : ''}`} role="status">
+              <i aria-hidden="true" /><i aria-hidden="true" /><i aria-hidden="true" />
+              <strong>{phase === 'scoring' ? copy.thinking : copy.noTap}</strong>
+            </div>
             <button type="button" className="syllabus-secondary" onClick={onExit}>
-              Back to nest
+              {copy.back}
             </button>
           </div>
         </section>

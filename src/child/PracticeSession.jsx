@@ -26,26 +26,17 @@ import {
   stageForSession,
 } from './sessionMachine.js'
 import World from './World.jsx'
+import { childCopy, languageDirection } from './i18n.js'
 import './child-world.css'
 
-function stageLabel(stage) {
-  return {
-    model_imitate: 'Copy Pip',
-    word_naming: 'Picture Meadow',
-    pairs: 'Sound Detective',
-    phrase: 'Tiny Story',
-    sentence: 'Story Flight',
-    conversation: 'Pip Chat',
-    live: 'Live with Pip',
-  }[stage] || 'Practice with Pip'
+function stageLabel(stage, copy) {
+  const stageIndex = ['model_imitate', 'word_naming', 'pairs', 'phrase', 'sentence', 'conversation', 'live'].indexOf(stage)
+  return copy.stages[stageIndex] || copy.stages[0]
 }
 
-function promptLine(stage, promptWord, cue) {
-  if (stage === 'model_imitate') return `My turn: ${promptWord}. Now your tiny copy.`
-  if (stage === 'word_naming') return `What’s this? Say ${promptWord} when you’re ready.`
-  if (stage === 'phrase') return `Finish my tiny story: ${promptWord}`
-  if (stage === 'sentence') return `Tell Pip the whole idea: ${promptWord}`
-  if (stage === 'pairs') return `Find ${promptWord}. Then say it to Pip.`
+function promptLine(stage, promptWord, cue, copy) {
+  const promptIndex = { model_imitate: 0, word_naming: 1, phrase: 2, sentence: 3, pairs: 4 }[stage]
+  if (promptIndex != null) return copy.prompts[promptIndex](promptWord)
   if (stage === 'conversation' || stage === 'live') {
     return promptWord || 'Tell Pip what happened next.'
   }
@@ -110,6 +101,8 @@ export default function PracticeSession({
   onExit,
   onSessionComplete,
 }) {
+  const language = child.language || engagement?.language || 'en'
+  const copy = childCopy(language)
   const [machine, dispatch] = useReducer(sessionReducer, initialSessionState)
   const [session, setSession] = useState(null)
   const [voiceState, setVoiceState] = useState({
@@ -151,10 +144,9 @@ export default function PracticeSession({
       }
       : prompts[promptIndex % Math.max(1, prompts.length)]
   const promptWord = currentPrompt?.word || session?.target?.phoneme || 'your sound'
-  const pipLine = feedback || promptLine(stage, promptWord, session?.target?.cue)
+  const pipLine = feedback || promptLine(stage, promptWord, session?.target?.cue, copy)
   // Keep conversation/live voice-first — self-rating buttons break the turn flow.
   const shouldUseSelfRating = false
-  const wantsHandsFreeConversation = stage === 'conversation' || stage === 'live'
   const isListening = machine.phase === SESSION_PHASES.listening
   const isBusy = [
     SESSION_PHASES.loading,
@@ -165,48 +157,22 @@ export default function PracticeSession({
     SESSION_PHASES.reward,
   ].includes(machine.phase)
 
-  const restoreHandsFreeListening = useCallback(async (readyMessage = 'Pip is listening. Just start talking.') => {
-    if (!wantsHandsFreeConversation || !voiceRef.current.snapshot.connected) {
-      dispatch({
-        type: 'transition',
-        phase: SESSION_PHASES.ready,
-        message: readyMessage.includes('listening')
-          ? 'Your turn whenever you’re ready.'
-          : readyMessage,
-      })
-      return
-    }
-    voiceRef.current.setHandsFree(true)
+  const restoreHandsFreeListening = useCallback(async (readyMessage = copy.listening) => {
+    const realtimeConnected = voiceRef.current.snapshot.connected
+    voiceRef.current.setHandsFree(realtimeConnected)
     dispatch({
       type: 'transition',
       phase: SESSION_PHASES.listening,
       message: readyMessage,
     })
-  }, [wantsHandsFreeConversation])
-
-  const beginChildTurn = useCallback(async ({ force = false } = {}) => {
-    // force=true when opening the next listen window from inside submitTurn —
-    // turnSubmissionInProgressRef is still true there and must not block capture.
-    if (!force && turnSubmissionInProgressRef.current) return
-    if (wantsHandsFreeConversation && voiceRef.current.snapshot.connected) {
-      await restoreHandsFreeListening()
-      return
+    if (!realtimeConnected) {
+      try {
+        await voiceRef.current.beginCapture({ maxMs: 5200 })
+      } catch {
+        dispatch({ type: 'transition', phase: SESSION_PHASES.ready, message: copy.reconnecting })
+      }
     }
-    try {
-      setFeedback('')
-      dispatch({
-        type: 'transition',
-        phase: SESSION_PHASES.listening,
-        message: 'Pip is listening…',
-      })
-      await voiceRef.current.beginCapture({ maxMs: 5000 })
-    } catch {
-      dispatch({
-        type: 'error',
-        error: 'A grown-up can check the microphone, then tap Try again.',
-      })
-    }
-  }, [restoreHandsFreeListening, wantsHandsFreeConversation])
+  }, [copy.listening, copy.reconnecting])
 
   const finishSession = useCallback(async () => {
     if (!session || endRequestedRef.current) return
@@ -250,8 +216,9 @@ export default function PracticeSession({
         message: 'Watch Pip’s little clue.',
       })
       await voiceRef.current.speak(result?.coach?.kid_line || session?.target?.cue || promptWord)
-      // Auto-open the next listen window so kids aren't stuck tapping after every miss.
-      await beginChildTurn({ force: true })
+      // Hands-free conversation reopens its listening window. Tap-to-talk modes
+      // return to ready so silence is never submitted as another child turn.
+      await restoreHandsFreeListening(copy.listening)
       return
     }
 
@@ -287,17 +254,18 @@ export default function PracticeSession({
       type: 'transition',
       phase: SESSION_PHASES.ready,
       incrementTurn: true,
-      message: 'A new adventure is ready.',
+      message: copy.newAdventure,
     })
-    await beginChildTurn({ force: true })
-  }, [attempt, beginChildTurn, finishSession, machine.turn, promptWord, session])
+    await restoreHandsFreeListening(copy.listening)
+  }, [attempt, copy.listening, finishSession, machine.turn, promptWord, restoreHandsFreeListening, session])
 
   const submitTurn = useCallback(async (blob, selfRating = null) => {
     if (!blob?.size || !session) {
       dispatch({
         type: 'error',
-        error: 'Pip didn’t catch that. Tap the microphone and try once more.',
+        error: copy.silence,
       })
+      await restoreHandsFreeListening(copy.listening)
       return
     }
     dispatch({
@@ -356,7 +324,7 @@ export default function PracticeSession({
         recoverTo: SESSION_PHASES.ready,
       })
     }
-  }, [attempt, berries, moveToNextTurn, promptWord, session])
+  }, [attempt, berries, copy.listening, copy.silence, moveToNextTurn, promptWord, restoreHandsFreeListening, session])
   processTurnRef.current = async (blob) => {
     if (turnSubmissionInProgressRef.current) return
     turnSubmissionInProgressRef.current = true
@@ -427,7 +395,7 @@ export default function PracticeSession({
           dispatch({
             type: 'transition',
             phase: SESSION_PHASES.modeling,
-            message: 'Watch Pip’s beak, then make a tiny copy.',
+            message: copy.modeling,
           })
           const modelLine = String(
             sessionPayload.exercise?.model_lines?.[0]
@@ -435,43 +403,21 @@ export default function PracticeSession({
             || sessionPayload.target?.phoneme
             || 'sss',
           )
-          await voice.speak(modelLine.startsWith('My turn') ? modelLine : `My turn: ${modelLine}.`)
+          await voice.speak(modelLine)
         }
         if (cancelled) return
         const connectionState = await voiceConnection
         if (cancelled) return
-        const handsFreeReady = conversationalStage && connectionState.connected
+        const handsFreeReady = connectionState.connected
         voice.setHandsFree(handsFreeReady)
         if (handsFreeReady) {
           dispatch({
             type: 'transition',
             phase: SESSION_PHASES.listening,
-            message: 'Pip is listening. Just start talking.',
+            message: copy.listening,
           })
         } else {
-          // Drill / fallback: open the mic immediately after Pip models so kids talk, not tap.
-          dispatch({
-            type: 'transition',
-            phase: SESSION_PHASES.ready,
-            message: 'Your turn whenever you’re ready.',
-          })
-          if (!cancelled) {
-            try {
-              setFeedback('')
-              dispatch({
-                type: 'transition',
-                phase: SESSION_PHASES.listening,
-                message: 'Pip is listening…',
-              })
-              await voice.beginCapture({ maxMs: 5000 })
-            } catch {
-              dispatch({
-                type: 'transition',
-                phase: SESSION_PHASES.ready,
-                message: 'Tap when you’re ready to talk.',
-              })
-            }
-          }
+          await restoreHandsFreeListening(copy.listening)
         }
       } catch (error) {
         if (!cancelled) dispatch({ type: 'error', error: error.message })
@@ -481,7 +427,7 @@ export default function PracticeSession({
       cancelled = true
       voice.disconnect()
     }
-  }, [child.id, child.display_name, engagement?.greeting, engagement?.language, recommendedMode])
+  }, [child.id, child.display_name, copy.listening, copy.modeling, engagement?.greeting, engagement?.language, recommendedMode, restoreHandsFreeListening])
 
   useEffect(() => {
     const nextPrompt = prompts[(promptIndex + 1) % Math.max(1, prompts.length)]
@@ -490,27 +436,6 @@ export default function PracticeSession({
     image.src = api.pictureUrl(nextPrompt.picture)
     return undefined
   }, [promptIndex, prompts])
-
-  const handleMicrophone = async () => {
-    if (turnSubmissionInProgressRef.current) return
-    if (machine.phase === SESSION_PHASES.recoverableError) {
-      dispatch({ type: 'recover' })
-      await beginChildTurn()
-      return
-    }
-    if (voiceRef.current.snapshot.childSpeaking) {
-      const blob = await voiceRef.current.endCapture()
-      await processTurnRef.current?.(blob)
-      return
-    }
-    if (
-      machine.phase !== SESSION_PHASES.ready
-      && !(machine.phase === SESSION_PHASES.listening && wantsHandsFreeConversation)
-    ) {
-      return
-    }
-    await beginChildTurn()
-  }
 
   const handleSelfRating = async (rating) => {
     const blob = pendingRatingBlob
@@ -529,7 +454,7 @@ export default function PracticeSession({
       phase: SESSION_PHASES.modeling,
       message: 'Pip will show it one more time.',
     })
-    await voiceRef.current.speak(promptLine(stage, promptWord, session.target?.cue))
+    await voiceRef.current.speak(promptLine(stage, promptWord, session.target?.cue, copy))
     dispatch({
       type: 'transition',
       phase: SESSION_PHASES.ready,
@@ -539,25 +464,25 @@ export default function PracticeSession({
 
   if (machine.phase === SESSION_PHASES.complete) {
     return (
-      <div className="syllabus-world syllabus-world--complete">
+      <div className="syllabus-world syllabus-world--complete" lang={language} dir={languageDirection(language)}>
         <World world={engagement?.world} warmth={1} />
         <Confetti burst={confetti} />
         <main className="session-complete">
           <Character state="celebrate" size={280} />
-          <p className="syllabus-kicker">ADVENTURE COMPLETE</p>
-          <h1>The meadow heard every brave try.</h1>
+          <p className="syllabus-kicker">{copy.practiceComplete}</p>
+          <h1>{copy.completeTitle}</h1>
           <p>{recap?.celebration || recap?.celebration_message || recap?.recap || machine.message}</p>
           {recap?.parent_summary && (
             <p className="session-parent-summary">{recap.parent_summary}</p>
           )}
           {session?.episode?.cliffhanger && (
             <div className="session-cliffhanger">
-              <span>Next time</span>
+              <span>{copy.nextTime}</span>
               {session.episode.cliffhanger}
             </div>
           )}
           <button type="button" className="syllabus-primary" onClick={onExit}>
-            Fly back to my nest
+            {copy.flyBack}
           </button>
         </main>
       </div>
@@ -565,7 +490,7 @@ export default function PracticeSession({
   }
 
   return (
-    <div className={`syllabus-world syllabus-world--${stage}`}>
+    <div className={`syllabus-world syllabus-world--${stage}`} lang={language} dir={languageDirection(language)}>
       <World world={engagement?.world} warmth={Math.min(1, berries / 8)} />
       <Confetti burst={confetti} />
       {hatchFriendIndex !== null && (
@@ -575,11 +500,11 @@ export default function PracticeSession({
         />
       )}
       <header className="syllabus-header">
-        <button type="button" className="syllabus-back" onClick={onExit} aria-label="Leave practice">←</button>
+        <button type="button" className="syllabus-back" onClick={onExit} aria-label={copy.leave}>←</button>
         <div className="syllabus-brand"><span>p</span> pipa</div>
         <div className="syllabus-chip">
           <i aria-hidden="true" />
-          {stageLabel(stage)}
+            {stageLabel(stage, copy)}
         </div>
       </header>
 
@@ -614,7 +539,7 @@ export default function PracticeSession({
             {session?.production_band?.replaceAll?.('_', ' ') || 'TODAY’S SOUND ADVENTURE'}
           </p>
           <div className="syllabus-bubble" aria-live="polite">
-            <span>PIP SAYS</span>
+                <span>{copy.coachSays}</span>
             {machine.phase === SESSION_PHASES.recoverableError ? machine.error : pipLine}
             {coachViseme && machine.phase !== SESSION_PHASES.recoverableError && (
               <small className="coach-viseme">{coachViseme}</small>
@@ -645,45 +570,23 @@ export default function PracticeSession({
             <SelfRating onRate={handleSelfRating} />
           ) : (
             <div className="syllabus-controls">
-              <button
-                type="button"
-                className={`syllabus-mic ${voiceState.childSpeaking ? 'is-listening' : ''}`}
-                onClick={handleMicrophone}
-                disabled={
-                  (isBusy && machine.phase !== SESSION_PHASES.recoverableError)
-                  || (wantsHandsFreeConversation && voiceState.connected && !voiceState.fallback)
-                  || (stage === 'pairs' && !selectedPairWord)
-                }
-                aria-pressed={voiceState.childSpeaking}
-              >
-                <span className="syllabus-mic__icon" aria-hidden="true" />
-                <strong>
-                  {machine.phase === SESSION_PHASES.recoverableError
-                    ? 'Try again'
-                    : voiceState.childSpeaking
-                      ? 'I’m done'
-                      : 'Talk with Pip'}
-                </strong>
-              </button>
-              {wantsHandsFreeConversation && voiceState.connected && !voiceState.fallback && (
-                <p className="hands-free-status" aria-live="polite">
-                  <i className={voiceState.childSpeaking ? 'is-active' : ''} />
-                  {voiceState.childSpeaking ? 'Pip can hear you' : 'Just start talking'}
-                </p>
-              )}
+              <div className={`hands-free-orb ${isListening ? 'is-listening' : ''}`} role="status">
+                <i aria-hidden="true" /><i aria-hidden="true" /><i aria-hidden="true" />
+                <strong>{isBusy ? copy.thinking : copy.noTap}</strong>
+              </div>
               <button
                 type="button"
                 className="syllabus-hear-again"
                 onClick={modelAgain}
                 disabled={isBusy}
               >
-                Hear Pip again
+                {copy.hearAgain}
               </button>
             </div>
           )}
           {voiceState.fallback && (
             <p className="voice-fallback-note">
-              Pip is using tap-to-talk while live voice reconnects.
+              {copy.reconnecting}
             </p>
           )}
         </section>

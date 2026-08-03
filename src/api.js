@@ -319,6 +319,8 @@ export const api = {
 
   waitlistCheckoutStatus: (sessionId) => req(`/waitlist/checkout/${encodeURIComponent(sessionId)}`),
 
+  billingOverview: () => req('/billing/overview'),
+
   register: (email, password) =>
     req('/auth/register', { method: 'POST', json: { email, password } }).then(rememberAuth),
 
@@ -417,11 +419,11 @@ export const api = {
     }
   },
 
-  saveTranscript: async () => ({ ok: true }),
-
   progress: (childId) => req(`/children/${childId}/progress`),
 
   engagement: (childId) => req(`/children/${childId}/engagement`),
+
+  saveTranscript: async () => ({ ok: true }),
 
   // Placement (Listening Game) — speech curriculum probes
   screenerItems: async (childId) => {
@@ -504,8 +506,7 @@ export const api = {
 
   mathStart: (childId) => {
     if (childId) {
-      // Authenticated path: reuse demo start for now (uses demo child) —
-      // prefer child-scoped path when available via demo bootstrap IDs.
+      return req(`/math/children/${childId}/start`, { method: 'POST' })
     }
     return req('/math/demo/start', { method: 'POST' })
   },
@@ -519,6 +520,18 @@ export const api = {
     method: 'POST',
     json: { session_id: sessionId, transcript },
   }),
+
+  mathAudioUtterance: (sessionId, blob, clientTranscript = null) => {
+    const form = new FormData()
+    form.append('session_id', sessionId)
+    if (clientTranscript) form.append('client_transcript', clientTranscript)
+    form.append('audio', blob, 'math-turn.webm')
+    return req('/math/utterance/audio', {
+      method: 'POST',
+      form,
+      timeoutMs: 45000,
+    })
+  },
 
   mathTopic: (sessionId, topic) => req('/math/topic', {
     method: 'POST',

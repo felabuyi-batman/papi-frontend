@@ -464,6 +464,25 @@
   transform: translateX(-50%);
 }
 
+.handsfree-orb {
+  width: 92px;
+  height: 92px;
+  border: 3px solid var(--child-ink);
+  border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #fff8cf 0 12%, #ffc94f 13% 52%, #ef7f53 100%);
+  box-shadow: 0 8px 0 var(--child-ink), 0 18px 38px rgba(66, 42, 28, .18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.handsfree-orb i { width: 7px; height: 20px; border-radius: 8px; background: var(--child-ink); animation: handsfree-wave 1s ease-in-out infinite; }
+.handsfree-orb i:nth-child(2) { height: 34px; animation-delay: -.22s; }
+.handsfree-orb i:nth-child(3) { animation-delay: -.44s; }
+.handsfree-orb.is-listening { animation: handsfree-breathe 1.5s ease-in-out infinite; }
+@keyframes handsfree-wave { 50% { transform: scaleY(.45); } }
+@keyframes handsfree-breathe { 50% { box-shadow: 0 8px 0 var(--child-ink), 0 0 0 15px rgba(255, 201, 79, .22), 0 18px 38px rgba(66, 42, 28, .18); } }
+
 .syllabus-hear-again {
   padding: 7px 12px;
   border: 0;

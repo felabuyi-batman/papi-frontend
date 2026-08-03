@@ -15,14 +15,24 @@ if (!supabaseUrl || !supabaseKey) {
 
 export { supabaseUrl, supabaseKey }
 
-export const supabase = createClient(supabaseUrl, supabaseKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flowType: 'pkce',
-  },
-})
+const unavailableAuth = {
+  getSession: async () => ({ data: { session: null }, error: null }),
+  refreshSession: async () => ({ data: { session: null }, error: null }),
+  exchangeCodeForSession: async () => ({ data: { session: null }, error: null }),
+  signOut: async () => ({ error: null }),
+  onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+}
+
+export const supabase = supabaseUrl && supabaseKey
+  ? createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      flowType: 'pkce',
+    },
+  })
+  : { auth: unavailableAuth }
 
 export function supabaseConfigured() {
   return Boolean(supabaseUrl && supabaseKey)
@@ -54,7 +64,7 @@ function friendlyAuthError(error) {
 }
 
 /** Sign up with email/password. Returns { needsEmailConfirmation, session }. */
-export async function signUpWithEmail(email, password) {
+export async function signUpWithEmail(email, password, captchaToken) {
   const cleanEmail = String(email || '').trim().toLowerCase()
   const cleanPassword = String(password || '')
   if (!cleanEmail || !cleanPassword) {
@@ -68,6 +78,7 @@ export async function signUpWithEmail(email, password) {
     password: cleanPassword,
     options: {
       emailRedirectTo: authRedirectTo(),
+      captchaToken,
     },
   })
   if (error) throw new Error(friendlyAuthError(error))
@@ -77,7 +88,7 @@ export async function signUpWithEmail(email, password) {
   return { user: data.user, session, needsEmailConfirmation }
 }
 
-export async function signInWithEmail(email, password) {
+export async function signInWithEmail(email, password, captchaToken) {
   const cleanEmail = String(email || '').trim().toLowerCase()
   const cleanPassword = String(password || '')
   if (!cleanEmail || !cleanPassword) {
@@ -86,6 +97,7 @@ export async function signInWithEmail(email, password) {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: cleanEmail,
     password: cleanPassword,
+    options: { captchaToken },
   })
   if (error) throw new Error(friendlyAuthError(error))
   if (!data.session?.access_token) {

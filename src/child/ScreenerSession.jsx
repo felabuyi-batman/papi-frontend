@@ -3,6 +3,7 @@ import { api } from '../api.js'
 import { ChildVoiceSession } from '../voice/ChildVoiceSession.js'
 import Character from './Character.jsx'
 import World from './World.jsx'
+import { childCopy, languageDirection } from './i18n.js'
 import './child-world.css'
 
 /**
@@ -21,6 +22,8 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
   const scoresRef = useRef({})
   const voiceRef = useRef(new ChildVoiceSession(api))
   const submitTurnRef = useRef(null)
+  const captureTimerRef = useRef(null)
+  const copy = childCopy(child.language)
 
   const item = items[index]
   const pictureUrl = item ? api.pictureUrl(item.picture) : null
@@ -42,7 +45,7 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
           return
         }
         setItems(payload.items || [])
-        const opening = `Hi ${child.display_name}! I forgot some words. Will you teach me?`
+        const opening = copy.opening(child.display_name)
         setPipLine(opening)
         setPhase('prompt')
         voice.connect({
@@ -51,6 +54,7 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
           language: child.language || 'en',
         }).catch(() => {})
         await voice.speak(opening)
+        if (!cancelled) beginHandsFreeCapture()
       } catch (requestError) {
         if (!cancelled) setError(requestError.message)
       }
@@ -59,26 +63,18 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
       cancelled = true
       unsubscribe()
       voice.disconnect()
+      window.clearTimeout(captureTimerRef.current)
     }
   }, [child.id, child.display_name, onDone])
 
-  async function handleMicrophone() {
-    if (error) {
-      setError(null)
-      setPhase('prompt')
-      return
-    }
-    if (voiceState.childSpeaking) {
-      const blob = await voiceRef.current.endCapture()
-      await submit(blob)
-      return
-    }
+  async function beginHandsFreeCapture() {
     try {
       setPhase('recording')
-      setPipLine('I’m listening…')
+      setPipLine(copy.listening)
       await voiceRef.current.beginCapture({ maxMs: 4000 })
     } catch {
-      setError('A grown-up can check the microphone, then tap Try again.')
+      setError(copy.reconnecting)
+      captureTimerRef.current = window.setTimeout(beginHandsFreeCapture, 1600)
     }
   }
 
@@ -87,7 +83,7 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
     setAttempt(1)
     if (next >= items.length) {
       setPhase('done')
-      const closing = 'You taught me so many words! Thank you!'
+      const closing = copy.taughtMe
       setPipLine(closing)
       await voiceRef.current.speak(closing)
       await api.screenerComplete(child.id, scoresRef.current)
@@ -96,18 +92,20 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
     }
     setIndex(next)
     setPhase('prompt')
-    const nextLine = items[next]?.prompt || 'Thanks! What’s this one?'
+    const nextLine = items[next]?.prompt || copy.nextPicture
     setPipLine(nextLine)
     await voiceRef.current.speak(nextLine)
+    await beginHandsFreeCapture()
   }
 
   async function submit(blob) {
     if (!blob?.size) {
-      setError('Pip didn’t catch that sound. Tap to try again.')
+      setError(copy.silence)
+      captureTimerRef.current = window.setTimeout(beginHandsFreeCapture, 900)
       return
     }
     setPhase('saving')
-    setPipLine('Pip is remembering your voice…')
+    setPipLine(copy.remembering)
     try {
       const result = await api.screenerTrial(child.id, {
         itemId: item.id,
@@ -123,24 +121,26 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
       if (!result.advance && attempt < 2) {
         setAttempt(2)
         setPhase('prompt')
+        await beginHandsFreeCapture()
         return
       }
       await advanceToNextItem()
     } catch (requestError) {
       setError(requestError.message)
       setPhase('prompt')
+      captureTimerRef.current = window.setTimeout(beginHandsFreeCapture, 1200)
     }
   }
   submitTurnRef.current = submit
 
   return (
-    <div className="syllabus-world syllabus-world--screener">
+    <div className="syllabus-world syllabus-world--screener" dir={languageDirection(child.language)}>
       <World world={{ current: 'nest', unlocked: ['nest'] }} />
       <header className="syllabus-header">
         <button type="button" className="syllabus-back" onClick={onSkip} aria-label="Skip for now">←</button>
         <div className="syllabus-brand"><span>p</span> pipa</div>
         <div className="syllabus-chip">
-          {items.length ? `${Math.min(index + 1, items.length)} of ${items.length}` : 'Listening game'}
+          {items.length ? `${Math.min(index + 1, items.length)} / ${items.length}` : copy.listeningGame}
         </div>
       </header>
 
@@ -163,10 +163,10 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
         </section>
 
         <section className="syllabus-challenge">
-          <p className="syllabus-kicker">PIP’S LISTENING GAME</p>
-          <h1 className="screener-title">What do you see?</h1>
+          <p className="syllabus-kicker">{copy.listeningGame}</p>
+          <h1 className="screener-title">{copy.whatSee}</h1>
           <div className="syllabus-bubble" aria-live="polite">
-            <span>PIP SAYS</span>
+            <span>{copy.coachSays}</span>
             {error || pipLine}
           </div>
 
@@ -191,28 +191,17 @@ export default function ScreenerSession({ child, onDone, onSkip }) {
                 <span aria-hidden="true"><i /><i /><i /><i /><i /></span>
                 <strong>
                   {phase === 'recording'
-                    ? 'Say the picture now'
-                    : phase === 'saving'
-                      ? 'Pip is thinking'
-                      : 'Tap once. Speak. Pip answers.'}
+                      ? copy.sayPicture
+                      : phase === 'saving'
+                      ? copy.thinking
+                      : copy.noTap}
                 </strong>
               </div>
-              <button
-                type="button"
-                className={`syllabus-mic ${voiceState.childSpeaking ? 'is-listening' : ''}`}
-                disabled={phase === 'saving'}
-                onClick={handleMicrophone}
-                aria-pressed={Boolean(voiceState.childSpeaking)}
-              >
-                <span className="syllabus-mic__icon" aria-hidden="true" />
-                <strong>
-                  {error ? 'Try again' : voiceState.childSpeaking ? 'I’m done' : 'Tap once to talk'}
-                </strong>
-              </button>
+              <div className={`handsfree-orb ${phase === 'recording' ? 'is-listening' : ''}`} aria-hidden="true"><i /><i /><i /></div>
             </div>
           )}
           {phase === 'done' && (
-            <p className="syllabus-bubble">Building {child.display_name}’s sound adventure…</p>
+            <p className="syllabus-bubble">{copy.building(child.display_name)}</p>
           )}
         </section>
       </main>

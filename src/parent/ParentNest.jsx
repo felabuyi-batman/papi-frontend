@@ -10,6 +10,7 @@ import {
   supabaseConfigured,
 } from '../supabase.js'
 import './parent-nest.css'
+import TurnstileVerifier, { turnstileSiteKey } from './TurnstileVerifier.jsx'
 
 export function NestShell({ children, onBrandClick, topRight, companion = true }) {
   return (
@@ -57,6 +58,8 @@ export function ParentAuth({ onDone, onBack }) {
   const [err, setErr] = useState(null)
   const [note, setNote] = useState(null)
   const [apiOnline, setApiOnline] = useState(null)
+  const [turnstileToken, setTurnstileToken] = useState('')
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -113,9 +116,12 @@ export function ParentAuth({ onDone, onBack }) {
       if (!online) {
         throw new Error('Pip’s nest is offline. Keep this tab open - we’re retrying the API.')
       }
+      if (!turnstileSiteKey() || !turnstileToken) {
+        throw new Error('Complete the Cloudflare security check, then try again.')
+      }
 
       if (mode === 'signup') {
-        const result = await signUpWithEmail(email, password)
+        const result = await signUpWithEmail(email, password, turnstileToken)
         if (result.needsEmailConfirmation) {
           setMode('check-email')
           setNote('We sent a confirmation link. Open it to unlock your nest.')
@@ -125,10 +131,12 @@ export function ParentAuth({ onDone, onBack }) {
         return
       }
 
-      await signInWithEmail(email, password)
+      await signInWithEmail(email, password, turnstileToken)
       await finishWithSession()
     } catch (error) {
       setErr(error.message)
+      setTurnstileToken('')
+      setTurnstileResetKey((value) => value + 1)
     } finally {
       setBusy(false)
     }
@@ -216,10 +224,16 @@ export function ParentAuth({ onDone, onBack }) {
           />
         </label>
 
+        <TurnstileVerifier
+          action={isSignup ? 'signup' : 'login'}
+          onToken={setTurnstileToken}
+          resetKey={turnstileResetKey}
+        />
+
         <button
           type="submit"
           className="nest__primary"
-          disabled={busy || apiOnline === false}
+          disabled={busy || apiOnline === false || !turnstileToken}
         >
           {busy ? 'Working…' : isSignup ? 'Sign up' : 'Sign in'}
         </button>
@@ -232,6 +246,8 @@ export function ParentAuth({ onDone, onBack }) {
             setErr(null)
             setNote(null)
             setMode(isSignup ? 'signin' : 'signup')
+            setTurnstileToken('')
+            setTurnstileResetKey((value) => value + 1)
           }}
         >
           {isSignup ? 'Already have a nest? Sign in' : 'New here? Sign up'}
@@ -491,19 +507,23 @@ export function ParentDashboard({
   const [language, setLanguage] = useState(child.language || 'en')
   const [err, setErr] = useState(null)
   const [langBusy, setLangBusy] = useState(false)
+  const [billing, setBilling] = useState(null)
+  const [billingBusy, setBillingBusy] = useState(false)
 
   useEffect(() => {
     if (isDemo) return undefined
     let cancelled = false
     ;(async () => {
       try {
-        const [progress, eng] = await Promise.all([
+        const [progress, eng, billingOverview] = await Promise.all([
           api.progress(child.id),
           api.engagement(child.id),
+          api.billingOverview().catch(() => null),
         ])
         if (cancelled) return
         setData(progress)
         setEngagement(eng)
+        setBilling(billingOverview)
         setLanguage(eng.language || child.language || 'en')
         setErr(null)
       } catch (error) {
@@ -517,6 +537,21 @@ export function ParentDashboard({
   const streakDays = engagement?.streak?.count ?? engagement?.streak?.current ?? data?.streak ?? 0
   const quest = engagement?.daily_quest
   const greeting = engagement?.greeting || engagement?.comeback
+  const insights = data?.insights || {}
+  const averageClarity = insights.avg_clarity ?? data?.average_score
+  const practiceMinutes = insights.practice_minutes_est ?? 0
+  const improvingSounds = insights.improving_sounds || []
+  const practiceSounds = insights.needs_practice_sounds || []
+  const recentTries = insights.recent_tries || []
+  const recommendations = [
+    practiceSounds.length
+      ? `Give /${practiceSounds[0]}/ a short, playful turn while energy is high.`
+      : 'Keep sessions short and finish while the game still feels fun.',
+    improvingSounds.length
+      ? `Celebrate /${improvingSounds[0]}/ in everyday words — the pattern is strengthening.`
+      : 'Repeat successful words naturally at meals or story time.',
+    'Aim for one calm five-minute visit today; consistency beats long sessions.',
+  ]
 
   async function changeLanguage(nextLanguage) {
     if (isDemo || nextLanguage === language) return
@@ -533,33 +568,53 @@ export function ParentDashboard({
     }
   }
 
+  async function manageAccess() {
+    if (!billing?.email) return
+    setBillingBusy(true)
+    setErr(null)
+    try {
+      const checkout = await api.startWaitlistCheckout(billing.email, 'parent-dashboard')
+      if (checkout.checkout_url) window.location.assign(checkout.checkout_url)
+      else setBilling((current) => ({ ...current, active: true, status: 'paid' }))
+    } catch (error) {
+      setErr(error.message)
+    } finally {
+      setBillingBusy(false)
+    }
+  }
+
   return (
     <NestShell
       onBrandClick={onBack}
+      companion={false}
       topRight={(
         <NestBack onClick={onBack}>
           {isDemo ? 'Back to Pipa' : 'All children'}
         </NestBack>
       )}
     >
-      <p className="nest__kicker">{isDemo ? 'Dashboard preview' : 'Today'}</p>
-      <h1 className="nest__title">
-        <em>{child.display_name}</em>
-        {' '}is finding their voice.
-      </h1>
-      <p className="nest__lede">{greeting || 'Ready when you are.'}</p>
+      <div className="nest-dashboard">
+        <section className="nest-dashboard__hero">
+          <div>
+            <p className="nest__kicker">{isDemo ? 'Dashboard preview' : 'Family field notes · Today'}</p>
+            <h1 className="nest__title"><em>{child.display_name}</em> is finding their voice.</h1>
+            <p className="nest__lede">{insights.parent_summary || greeting || 'Ready when you are.'}</p>
+          </div>
+          <div className="nest-dashboard__pip">
+            <span>Pip’s growth stage</span>
+            <strong>{String(pipLabel)}</strong>
+            <small>{streakDays ? `${streakDays} day rhythm` : 'A fresh start today'}</small>
+          </div>
+        </section>
 
-      <div className="nest__panel">
-        <div className="nest__meta">
-          <span>{String(pipLabel)}</span>
-        </div>
+        <div className="nest__panel nest-dashboard__panel">
 
         {err && <p className="nest__error">{err}</p>}
         {!data && !err && <p className="nest__note">Waking Pip…</p>}
 
         {data && (
           <>
-            <dl className="nest__metrics">
+            <dl className="nest__metrics nest-dashboard__metrics">
               <div>
                 <dt>Tries this week</dt>
                 <dd>{data.weekly_trials ?? 0}</dd>
@@ -569,16 +624,37 @@ export function ParentDashboard({
                 <dd>{streakDays}</dd>
               </div>
               <div>
-                <dt>Daily quest</dt>
-                <dd>{quest ? `${quest.progress ?? 0}/${quest.goal ?? 10}` : '-'}</dd>
+                <dt>Practice time</dt>
+                <dd>{practiceMinutes}<small> min</small></dd>
+              </div>
+              <div>
+                <dt>Average clarity</dt>
+                <dd>{averageClarity == null ? '—' : `${Math.round(averageClarity <= 1 ? averageClarity * 100 : averageClarity)}%`}</dd>
               </div>
             </dl>
 
-            <div className="nest__actions">
+            <div className="nest-dashboard__grid">
+              <section className="nest-dashboard__focus">
+                <span className="nest-dashboard__eyebrow">Recommended next</span>
+                <h2>{EXPERIENCE_LABELS[engagement?.recommended_mode] || 'Practice with Pip'}</h2>
+                <p>{recommendations[0]}</p>
+                <button type="button" className="nest__primary" onClick={onPractice}>
+                  {isDemo ? 'Create your family nest' : 'Start the next adventure'}
+                </button>
+              </section>
+
+              <section className="nest-dashboard__recommendations">
+                <span className="nest-dashboard__eyebrow">For this week</span>
+                <h2>Little moves, real momentum</h2>
+                <ol>{recommendations.map((recommendation, recommendationIndex) => (
+                  <li key={recommendation}><span>{recommendationIndex + 1}</span>{recommendation}</li>
+                ))}</ol>
+              </section>
+            </div>
+
+            <div className="nest__actions nest-dashboard__actions">
               <button type="button" className="nest__primary" onClick={onPractice}>
-                {isDemo
-                  ? 'Create your family nest'
-                  : EXPERIENCE_LABELS[engagement?.recommended_mode] || 'Practice with Pip'}
+                Practice with Pip
               </button>
               {onScreener && (
                 <button type="button" className="nest__secondary" onClick={onScreener}>
@@ -608,7 +684,9 @@ export function ParentDashboard({
             )}
 
             {(data.targets || []).length > 0 && (
-              <div className="nest__sounds" aria-label="Sound progress">
+              <section className="nest-dashboard__section">
+                <div className="nest-dashboard__section-title"><span className="nest-dashboard__eyebrow">Sound map</span><h2>Where confidence is growing</h2></div>
+                <div className="nest__sounds" aria-label="Sound progress">
                 {data.targets.map((target) => {
                   const accuracy = target.recent_accuracy
                   const pct = accuracy == null
@@ -628,8 +706,34 @@ export function ParentDashboard({
                     </div>
                   )
                 })}
-              </div>
+                </div>
+              </section>
             )}
+
+            <div className="nest-dashboard__lower">
+              <section className="nest-dashboard__section">
+                <span className="nest-dashboard__eyebrow">Recent moments</span>
+                <h2>Latest tries</h2>
+                {recentTries.length ? (
+                  <ul className="nest-dashboard__tries">{recentTries.slice(0, 4).map((attemptItem, attemptIndex) => (
+                    <li key={`${attemptItem.created_at || attemptIndex}`}>
+                      <strong>{attemptItem.word || attemptItem.expected_text || 'Practice turn'}</strong>
+                      <span>{attemptItem.score == null ? 'Captured' : `${Math.round(attemptItem.score)}% clarity`}</span>
+                    </li>
+                  ))}</ul>
+                ) : <p className="nest__note">The first practice moments will appear here.</p>}
+              </section>
+
+              {!isDemo && billing && (
+                <section className="nest-dashboard__section nest-dashboard__plan">
+                  <span className="nest-dashboard__eyebrow">Family access</span>
+                  <h2>{billing.plan_name}</h2>
+                  <p>{billing.active ? 'Your founding access is active.' : 'One payment. No recurring charge.'}</p>
+                  <div><strong>{billing.active ? 'Active' : `$${((billing.amount_cents || 0) / 100).toFixed(0)}`}</strong><span>{billing.recurring ? ' billed regularly' : ' lifetime founding access'}</span></div>
+                  {!billing.active && <button type="button" className="nest__secondary" disabled={billingBusy} onClick={manageAccess}>{billingBusy ? 'Opening secure checkout…' : 'Update family access'}</button>}
+                </section>
+              )}
+            </div>
 
             <p className="nest__clinical">
               {isDemo
@@ -638,6 +742,7 @@ export function ParentDashboard({
             </p>
           </>
         )}
+        </div>
       </div>
     </NestShell>
   )

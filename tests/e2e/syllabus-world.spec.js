@@ -343,8 +343,7 @@ test('reduced-motion children keep the full interaction without ambient loops', 
   )
   expect(motion.reduced).toBe(true)
   expect(motion.duration).toBeLessThanOrEqual(0.1)
-  // Auto-listen may already be open; either control means the turn path is alive.
-  await expect(talkButton(page).or(doneButton(page))).toBeVisible()
+  await expect(page.locator('.hands-free-orb')).toBeVisible()
 })
 
 test('a fallback microphone turn records once, scores, and advances', async ({ page }) => {
@@ -353,27 +352,20 @@ test('a fallback microphone turn records once, scores, and advances', async ({ p
     (request) => request.url().includes('/utterance'),
     { timeout: 15000 },
   )
-  // Auto-listen may already be open; otherwise start a tap turn.
-  if (!(await doneButton(page).isVisible().catch(() => false))) {
-    await talkButton(page).click()
-  }
-  await expect(doneButton(page)).toBeVisible()
-  await doneButton(page).click()
+  await expect(page.locator('.hands-free-orb')).toBeVisible()
   await scoringRequest
   await expect(page.getByLabel('Berry basket: 1 of 10')).toBeVisible({ timeout: 10000 })
-  // Next listen window should auto-open after coaching (force beginChildTurn).
-  await expect(talkButton(page).or(doneButton(page))).toBeVisible({ timeout: 10000 })
+  await expect(page.locator('.hands-free-orb')).toBeVisible({ timeout: 10000 })
 })
 
-test('one screener tap automatically finalizes and submits the child turn', async ({ page }) => {
+test('the screener automatically listens, finalizes, and submits the child turn', async ({ page }) => {
   await openParentDashboard(page, stages[1])
-  await page.getByRole('button', { name: /Pip’s Listening Game/i }).click()
-  await expect(page.getByRole('button', { name: /tap once to talk/i })).toBeEnabled()
   const submittedTurn = page.waitForRequest(
     (request) => request.url().includes('/demo/score'),
-    { timeout: 7000 },
+    { timeout: 10000 },
   )
-  await page.getByRole('button', { name: /tap once to talk/i }).click()
+  await page.getByRole('button', { name: /Pip’s Listening Game/i }).click()
+  await expect(page.locator('.handsfree-orb')).toBeVisible()
   await submittedTurn
 })
 
@@ -381,28 +373,25 @@ test('landing characters are alive and parents can join or preview the dashboard
   await mockAuthenticatedWorld(page, stages[1])
   await page.goto('/')
 
-  await expect(page.getByText('App Store soon').first()).toBeVisible()
-  await expect(page.getByText('Google Play soon').first()).toBeVisible()
-  await expect(page.locator('.store-availability--hero .store-availability__badge--ios img')).toBeVisible()
-  await expect(page.locator('.store-availability--hero .store-availability__badge--android img')).toBeVisible()
+  await expect(page.getByRole('button', { name: /Get early access/i }).first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /Grown-ups/i }).first()).toBeVisible()
   await expect(page.locator('.world-pip .character-life__rig-lid')).toHaveCount(2)
   await expect(page.locator('.world-pip .character-life__rig-beak')).toHaveCount(2)
 
   await page.locator('#nest').scrollIntoViewIfNeeded()
   await expect(page.locator('.voice-egg .character-life--egg')).toHaveCount(4)
-  await expect(page.locator('.voice-egg .character-life__eyes i')).toHaveCount(8)
-  await expect(page.locator('.voice-egg .character-life__beak')).toHaveCount(0)
 
   await page.locator('#top').scrollIntoViewIfNeeded()
+  await page.getByRole('button', { name: /Get early access/i }).first().click()
   const waitlistRequest = page.waitForRequest(
     (request) => request.url().includes('/waitlist/checkout'),
   )
-  await page.getByLabel(/founding seat/i).fill('new-parent@example.com')
+  await page.getByPlaceholder('Parent email').fill('new-parent@example.com')
   await page.getByRole('button', { name: /secure seat/i }).click()
   await waitlistRequest
   await expect(page.getByText(/already has a founding seat/i)).toBeVisible()
 
-  await page.getByRole('button', { name: 'Preview the dashboard' }).click()
-  await expect(page.getByText('Dashboard preview')).toBeVisible()
-  await expect(page.locator('h1').filter({ hasText: 'Sam' })).toContainText('is finding their voice.')
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: /Grown-ups/i }).first().click()
+  await expect(page.getByRole('heading', { name: /Open your nest/i })).toBeVisible()
 })

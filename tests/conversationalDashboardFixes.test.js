@@ -84,9 +84,8 @@ test('feedback and modeling can auto-open listening without recoverable error', 
 test('PracticeSession stays voice-first for conversation turns', () => {
   const practiceSource = readSrc('src/child/PracticeSession.jsx')
   assert.match(practiceSource, /shouldUseSelfRating = false/)
-  assert.match(practiceSource, /beginChildTurn/)
+  assert.doesNotMatch(practiceSource, /syllabus-mic/)
   assert.match(practiceSource, /automaticResponses: conversationalStage/)
-  assert.match(practiceSource, /Talk with Pip/)
-  // Auto-listen after scoring must force past the in-flight turn gate.
-  assert.match(practiceSource, /beginChildTurn\(\{ force: true \}\)/)
+  assert.match(practiceSource, /restoreHandsFreeListening/)
+  assert.match(practiceSource, /beginCapture\(\{ maxMs: 5200 \}\)/)
 })
