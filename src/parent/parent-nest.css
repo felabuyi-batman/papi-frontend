@@ -576,7 +576,12 @@
   background: #fffdf8;
 }
 
-.nest__turnstile { position: absolute; width: 1px; height: 1px; overflow: hidden; }
+.nest__turnstile {
+  width: 100%;
+  min-height: 1px;
+  display: flex;
+  justify-content: center;
+}
 
 /* Parent entry: a quieter, trust-first threshold before the data-rich nest. */
 .nest--auth {

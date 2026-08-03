@@ -41,7 +41,8 @@ export default function TurnstileVerifier({ action, onToken, resetKey }) {
       widgetIdRef.current = turnstile.render(containerRef.current, {
         sitekey: siteKey,
         action,
-        size: 'invisible',
+        size: 'flexible',
+        appearance: 'interaction-only',
         callback: (token) => onToken(token),
         'expired-callback': () => onToken(''),
         'error-callback': () => onToken(''),
@@ -65,6 +66,6 @@ export default function TurnstileVerifier({ action, onToken, resetKey }) {
   }
 
   return (
-    <div className="nest__turnstile" aria-hidden="true" ref={containerRef} />
+    <div className="nest__turnstile" ref={containerRef} />
   )
 }
