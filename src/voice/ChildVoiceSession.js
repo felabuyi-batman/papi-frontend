@@ -184,6 +184,8 @@ export class ChildVoiceSession {
     this.peerConnection = peerConnection
     this.remoteAudio = document.createElement('audio')
     this.remoteAudio.autoplay = true
+    this.remoteAudio.muted = true
+    this.remoteAudio.volume = 0
     this.remoteAudio.setAttribute('playsinline', 'true')
     peerConnection.ontrack = (event) => {
       this.remoteAudio.srcObject = event.streams[0]
@@ -264,6 +266,7 @@ export class ChildVoiceSession {
 
   async #speakWithCoachTts(text) {
     const playbackToken = ++this.ttsPlaybackToken
+    if (this.localTrack) this.localTrack.enabled = false
     try {
       const blob = await this.api.coachTts(text, { language: this.language })
       if (playbackToken !== this.ttsPlaybackToken) return { ok: false, interrupted: true }

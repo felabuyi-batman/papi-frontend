@@ -32,6 +32,9 @@ class PipVoiceBridge {
     this.busy = false
     this.assistantTurns = 0
     this.sessionActive = false
+    this.ttsAudio = null
+    this.ttsPlaybackToken = 0
+    this.assistantTranscriptBuffer = ''
   }
 
   get isBusy() {
@@ -53,6 +56,8 @@ class PipVoiceBridge {
 
       this.remoteAudioElement = document.createElement('audio')
       this.remoteAudioElement.autoplay = true
+      this.remoteAudioElement.muted = true
+      this.remoteAudioElement.volume = 0
       this.remoteAudioElement.setAttribute('playsinline', 'true')
       peerConnection.ontrack = (event) => {
         this.remoteAudioElement.srcObject = event.streams[0]
@@ -112,15 +117,99 @@ class PipVoiceBridge {
     return this.connectPromise
   }
 
-  #onServerEvent(event) {
+  async #speakWithCoachTts(text) {
+    const line = String(text || '').trim()
+    if (!line) return { ok: true }
+    const playbackToken = ++this.ttsPlaybackToken
+    if (this.localAudioTrack) this.localAudioTrack.enabled = false
+    try {
+      const blob = await api.coachTts(line)
+      if (playbackToken !== this.ttsPlaybackToken) return { ok: false, interrupted: true }
+      const url = URL.createObjectURL(blob)
+      await new Promise((resolve) => {
+        try { this.ttsAudio?.pause() } catch { /* no-op */ }
+        const audio = new Audio(url)
+        this.ttsAudio = audio
+        let finished = false
+        const finish = () => {
+          if (finished) return
+          finished = true
+          if (playbackToken === this.ttsPlaybackToken) {
+            this.ttsAudio = null
+            if (this.localAudioTrack) this.localAudioTrack.enabled = this.sessionActive
+          }
+          URL.revokeObjectURL(url)
+          resolve()
+        }
+        audio.onended = finish
+        audio.onerror = finish
+        audio.play().catch(finish)
+      })
+      return { ok: true, voice: 'coach_tts' }
+    } catch {
+      await FALLBACK_SPEAK(line)
+      if (playbackToken === this.ttsPlaybackToken && this.localAudioTrack) {
+        this.localAudioTrack.enabled = this.sessionActive
+      }
+      return { ok: true, fallback: true }
+    }
+  }
+
+  #interruptCoachSpeech() {
+    this.ttsPlaybackToken += 1
+    try { this.ttsAudio?.pause() } catch { /* no-op */ }
+    this.ttsAudio = null
+    window.speechSynthesis?.cancel()
+  }
+
+  async #onServerEvent(event) {
     let payload
     try {
       payload = JSON.parse(event.data)
     } catch {
       return
     }
-    if (payload.type === 'response.done' || payload.type === 'response.cancelled') {
+    if (payload.type === 'response.created') {
+      this.assistantTranscriptBuffer = ''
+    }
+    if (
+      payload.type === 'response.output_text.delta'
+      || payload.type === 'response.text.delta'
+      || payload.type === 'response.output_audio_transcript.delta'
+      || payload.type === 'response.audio_transcript.delta'
+    ) {
+      this.assistantTranscriptBuffer += String(payload.delta || '')
+    }
+    if (
+      payload.type === 'response.output_text.done'
+      || payload.type === 'response.output_audio_transcript.done'
+      || payload.type === 'response.audio_transcript.done'
+    ) {
+      this.assistantTranscriptBuffer = String(
+        payload.text || payload.transcript || this.assistantTranscriptBuffer,
+      )
+    }
+    if (payload.type === 'input_audio_buffer.speech_started') {
+      this.#interruptCoachSpeech()
+      this.#send({ type: 'response.cancel' })
+    }
+    if (payload.type === 'response.done') {
+      const responseContent = (payload.response?.output || [])
+        .flatMap((item) => item.content || [])
+      const completedText = String(
+        this.assistantTranscriptBuffer
+        || responseContent.find((content) => content.text)?.text
+        || responseContent.find((content) => content.transcript)?.transcript
+        || '',
+      ).trim()
+      this.assistantTranscriptBuffer = ''
       this.assistantTurns += 1
+      if (completedText) await this.#speakWithCoachTts(completedText)
+      const waiters = this.responseWaiters.splice(0)
+      waiters.forEach((resolve) => resolve(payload))
+    }
+    if (payload.type === 'response.cancelled') {
+      this.assistantTranscriptBuffer = ''
       const waiters = this.responseWaiters.splice(0)
       waiters.forEach((resolve) => resolve(payload))
     }
@@ -138,33 +227,7 @@ class PipVoiceBridge {
   async say(text) {
     const line = String(text || '').trim()
     if (!line) return { ok: true }
-
-    const connected = await this.ensureConnected()
-    if (!connected) {
-      await FALLBACK_SPEAK(line)
-      return { ok: true, fallback: true }
-    }
-
-    if (this.localAudioTrack) this.localAudioTrack.enabled = false
-
-    const done = new Promise((resolve) => {
-      this.responseWaiters.push(resolve)
-      window.setTimeout(() => resolve({ type: 'timeout' }), 14000)
-    })
-
-    const sent = this.#send({
-      type: 'response.create',
-      response: {
-        instructions:
-          `Speak this to a young child in your warm Pip voice, then stop and wait.\n\n${line}`,
-      },
-    })
-    if (!sent) {
-      await FALLBACK_SPEAK(line)
-      return { ok: true, fallback: true }
-    }
-    await done
-    return { ok: true }
+    return this.#speakWithCoachTts(line)
   }
 
   async #scoreClip({ promptWord, phoneme, ms = 2200 }) {
@@ -226,10 +289,10 @@ class PipVoiceBridge {
       onStatus?.('talking')
 
       if (!connected) {
-        await FALLBACK_SPEAK(opener)
+        await this.say(opener)
         onStatus?.('listening')
         lastScore = await this.#scoreClip({ promptWord, phoneme, ms: 2800 })
-        await FALLBACK_SPEAK(
+        await this.say(
           lastScore?.outcome === 'correct'
             ? 'Yay! That was so brave. Bye for now!'
             : 'Thanks for playing with me! See you soon!',
@@ -300,6 +363,7 @@ class PipVoiceBridge {
 
   disconnect() {
     this._scoreHook = null
+    this.#interruptCoachSpeech()
     try { this.dataChannel?.close() } catch { /* ignore */ }
     try { this.peerConnection?.close() } catch { /* ignore */ }
     try { this.localAudioTrack?.stop() } catch { /* ignore */ }
@@ -310,6 +374,7 @@ class PipVoiceBridge {
     this.mediaStream = null
     this.ephemeralToken = null
     this.responseWaiters = []
+    this.assistantTranscriptBuffer = ''
     this.sessionActive = false
     this.busy = false
   }

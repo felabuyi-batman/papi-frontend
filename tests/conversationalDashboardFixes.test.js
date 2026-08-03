@@ -46,6 +46,7 @@ test('fallback capture unmutes the microphone track', () => {
 
 test('OpenAI Realtime text is rendered by ElevenLabs with child barge-in', () => {
   const voiceSource = readSrc('src/voice/ChildVoiceSession.js')
+  const landingVoiceSource = readSrc('src/voice/PipVoiceBridge.js')
   assert.match(voiceSource, /response\.output_text\.delta/)
   assert.match(voiceSource, /#speakWithCoachTts\(completedText\)/)
   assert.match(voiceSource, /this\.#interruptCoachSpeech\(\)/)
@@ -56,6 +57,10 @@ test('OpenAI Realtime text is rendered by ElevenLabs with child barge-in', () =>
   )
   assert.match(speakBlock, /return this\.#speakWithCoachTts\(line\)/)
   assert.doesNotMatch(speakBlock, /output_modalities: \['audio'\]/)
+  assert.match(voiceSource, /this\.remoteAudio\.muted = true/)
+  assert.match(landingVoiceSource, /api\.coachTts\(line\)/)
+  assert.match(landingVoiceSource, /this\.remoteAudioElement\.muted = true/)
+  assert.match(landingVoiceSource, /await this\.#speakWithCoachTts\(completedText\)/)
 })
 
 test('conversation recommendation is not flattened into drill stages', () => {
