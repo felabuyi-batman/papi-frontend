@@ -12,9 +12,9 @@ import {
 import './parent-nest.css'
 import TurnstileVerifier, { turnstileSiteKey } from './TurnstileVerifier.jsx'
 
-export function NestShell({ children, onBrandClick, topRight, companion = true }) {
+export function NestShell({ children, onBrandClick, topRight, companion = true, pageClassName = '' }) {
   return (
-    <div className="nest">
+    <div className={['nest', pageClassName].filter(Boolean).join(' ')}>
       <div className="nest__atmosphere" aria-hidden="true">
         <div className="nest__wash" />
         <div className="nest__meadow" />
@@ -161,6 +161,7 @@ export function ParentAuth({ onDone, onBack }) {
       <NestShell
         onBrandClick={onBack}
         topRight={<NestBack onClick={onBack}>Back to play</NestBack>}
+        pageClassName="nest--auth"
       >
         <p className="nest__kicker">Check your inbox</p>
         <h1 className="nest__title">Confirm your email.</h1>
@@ -192,16 +193,28 @@ export function ParentAuth({ onDone, onBack }) {
     <NestShell
       onBrandClick={onBack}
       topRight={<NestBack onClick={onBack}>Back to play</NestBack>}
+      pageClassName="nest--auth"
     >
-      <p className="nest__kicker">Grown-ups</p>
-      <h1 className="nest__title">{isSignup ? 'Create your nest.' : 'Open your nest.'}</h1>
-      <p className="nest__lede">
-        {isSignup
-          ? 'Sign up with email. We’ll send a confirmation link before anything private opens.'
-          : 'Sign in with the email you verified. Private progress for parents — Pipa keeps practice playful for kids.'}
-      </p>
+      <div className="nest-auth__intro">
+        <p className="nest__kicker">The grown-up nest</p>
+        <h1 className="nest__title">{isSignup ? 'Create a calmer practice rhythm.' : 'Open your nest.'}</h1>
+        <p className="nest__lede">
+          {isSignup
+            ? 'Set up a private place for practice plans, recommendations, and every small win.'
+            : 'See what is clicking, what needs support, and the best next activity for your child.'}
+        </p>
+        <dl className="nest-auth__trust" aria-label="What parents can do in the nest">
+          <div><dt>Progress</dt><dd>Clear, child-friendly trends</dd></div>
+          <div><dt>Next steps</dt><dd>Personalized recommendations</dd></div>
+          <div><dt>Privacy</dt><dd>Voice discarded by default</dd></div>
+        </dl>
+      </div>
 
-      <form className="nest__panel" onSubmit={submit}>
+      <form className="nest__panel nest-auth__panel" onSubmit={submit}>
+        <div className="nest-auth__panel-head">
+          <span>{isSignup ? 'New family' : 'Parent sign in'}</span>
+          <strong>{isSignup ? 'Start your nest' : 'Open your nest'}</strong>
+        </div>
         <label className="nest__field">
           <span>Email</span>
           <input
@@ -260,7 +273,7 @@ export function ParentAuth({ onDone, onBack }) {
         )}
         {err && <p className="nest__error">{err}</p>}
         <p className="nest__note">
-          Email verification is required. Voice is scored and discarded by default.
+          Email verification keeps each family’s progress private.
         </p>
       </form>
     </NestShell>

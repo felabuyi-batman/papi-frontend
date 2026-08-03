@@ -578,6 +578,73 @@
 
 .nest__turnstile { position: absolute; width: 1px; height: 1px; overflow: hidden; }
 
+/* Parent entry: a quieter, trust-first threshold before the data-rich nest. */
+.nest--auth {
+  background:
+    radial-gradient(circle at 82% 12%, rgba(255, 224, 112, .42), transparent 24%),
+    linear-gradient(145deg, #397dcc 0%, #69b7d9 48%, #b9dd9d 100%);
+}
+.nest--auth .nest__wash {
+  background:
+    radial-gradient(ellipse 36% 26% at 14% 18%, rgba(255, 255, 255, .2), transparent 70%),
+    linear-gradient(115deg, rgba(25, 60, 105, .14), transparent 46%);
+}
+.nest--auth .nest__meadow { opacity: .68; }
+.nest--auth .nest__shell { width: min(1240px, calc(100% - 40px)); padding-top: 24px; }
+.nest--auth .nest__stage.has-companion {
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 430px);
+  align-items: center;
+  gap: clamp(36px, 7vw, 96px);
+}
+.nest--auth .nest__main {
+  grid-template-columns: minmax(280px, .92fr) minmax(340px, 480px);
+  align-items: center;
+  gap: clamp(30px, 5vw, 70px);
+}
+.nest-auth__intro { display: grid; gap: 15px; align-content: center; }
+.nest--auth .nest__title { max-width: 11ch; font-size: clamp(2.8rem, 5.6vw, 5rem); line-height: .94; }
+.nest--auth .nest__lede { max-width: 42ch; font-size: 1.08rem; line-height: 1.55; }
+.nest-auth__trust { margin: 16px 0 0; display: grid; gap: 0; border-top: 1px solid rgba(255,255,255,.34); }
+.nest-auth__trust div { display: grid; grid-template-columns: 88px 1fr; gap: 14px; padding: 11px 0; border-bottom: 1px solid rgba(255,255,255,.34); }
+.nest-auth__trust dt { color: #fff; font-weight: 900; }
+.nest-auth__trust dd { margin: 0; color: rgba(255,255,255,.8); font-weight: 700; }
+.nest-auth__panel {
+  width: 100%;
+  padding: clamp(24px, 3vw, 34px);
+  gap: 17px;
+  border-color: rgba(255,255,255,.78);
+  background: rgba(255, 253, 248, .94);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 28px 80px rgba(18, 54, 83, .2), inset 0 1px 0 #fff;
+}
+.nest-auth__panel-head { display: grid; gap: 4px; margin-bottom: 3px; }
+.nest-auth__panel-head span { color: var(--nest-mute); font-size: .72rem; font-weight: 900; letter-spacing: .09em; text-transform: uppercase; }
+.nest-auth__panel-head strong { font-family: var(--font-display, 'Fredoka', sans-serif); font-size: 1.7rem; letter-spacing: -.025em; }
+.nest--auth .nest__field span { color: #48515d; }
+.nest--auth .nest__field input { min-height: 50px; border: 1.5px solid rgba(28,36,48,.18); background: rgba(255,255,255,.88); transition: border-color .15s ease, box-shadow .15s ease; }
+.nest--auth .nest__field input:hover { border-color: rgba(28,36,48,.34); }
+.nest--auth .nest__field input:focus-visible { border-color: #2c6eae; outline: none; box-shadow: 0 0 0 4px rgba(44,110,174,.15); }
+.nest--auth .nest__primary { min-height: 52px; margin-top: 3px; box-shadow: 0 4px 0 #c99725, 0 12px 24px rgba(201,151,37,.18); }
+.nest--auth .nest__field--quiet { border-color: transparent; background: transparent; margin-top: -2px; }
+.nest--auth .nest__note { padding-top: 13px; border-top: 1px solid var(--nest-line); text-align: center; }
+.nest--auth .nest__companion { width: min(100%, 420px); filter: drop-shadow(0 30px 30px rgba(31,66,65,.16)); }
+
+@media (max-width: 1080px) {
+  .nest--auth .nest__stage.has-companion { grid-template-columns: minmax(0, 1fr) 250px; gap: 30px; }
+  .nest--auth .nest__main { grid-template-columns: 1fr; max-width: 540px; }
+  .nest-auth__trust { display: none; }
+}
+
+@media (max-width: 760px) {
+  .nest--auth .nest__shell { width: min(100% - 24px, 540px); padding-top: 14px; }
+  .nest--auth .nest__stage.has-companion { grid-template-columns: 1fr; gap: 20px; }
+  .nest--auth .nest__companion { display: none; }
+  .nest--auth .nest__main { gap: 24px; }
+  .nest--auth .nest__title { max-width: 13ch; font-size: clamp(2.5rem, 11vw, 3.5rem); }
+  .nest--auth .nest__lede { font-size: .98rem; }
+  .nest-auth__panel { border-radius: 22px; padding: 22px 18px; }
+}
+
 .nest-dashboard { width: min(1120px, 100%); margin-inline: auto; display: grid; gap: 22px; }
 .nest-dashboard__hero { display: grid; grid-template-columns: minmax(0, 1fr) 250px; gap: 32px; align-items: end; }
 .nest-dashboard__hero .nest__title { max-width: 760px; }
