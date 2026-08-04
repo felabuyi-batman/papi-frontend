@@ -82,8 +82,12 @@ export function ParentAuth({ onDone, onBack, initialMode = 'signin' }) {
         const session = await getSupabaseSession()
         if (session?.access_token) {
           setToken(session.access_token, session.refresh_token || null)
-        } else if (!localStorage.getItem('chirp.accessToken')) {
-          return
+        } else {
+          const stored = localStorage.getItem('chirp.accessToken')
+          if (!stored) return
+          // Module token can be stale after a prior logout in the same tab lifecycle;
+          // always rehydrate from localStorage before /auth/me.
+          setToken(stored, localStorage.getItem('chirp.refreshToken') || null)
         }
         await api.me()
         if (!cancelled) onDone()
