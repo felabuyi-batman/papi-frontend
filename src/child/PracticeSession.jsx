@@ -94,6 +94,28 @@ function SelfRating({ onRate }) {
   )
 }
 
+function sessionWithExercise(current, exercise) {
+  if (!current || !exercise) return current
+  const word = exercise.expected_text || exercise.display_label || 'your sound'
+  return {
+    ...current,
+    exercise,
+    target: {
+      ...(current.target || {}),
+      target_id: exercise.id || current.target?.target_id,
+      phoneme: exercise.target_phoneme || current.target?.phoneme,
+      prompts: [{
+        word,
+        prompt: exercise.prompt || `Say ${word}`,
+        image_url: exercise.image_url,
+        cue: exercise.cue || exercise.placement_cue,
+      }],
+      cue: exercise.cue || exercise.placement_cue || current.target?.cue,
+      model_lines: exercise.model_lines || [],
+    },
+  }
+}
+
 export default function PracticeSession({
   child,
   engagement,
@@ -127,6 +149,7 @@ export default function PracticeSession({
   const endRequestedRef = useRef(false)
   const turnSubmissionInProgressRef = useRef(false)
   const processTurnRef = useRef(null)
+  const realtimeToolResultRef = useRef(null)
 
   const stage = useMemo(
     () => stageForSession({ recommendedMode, session }),
@@ -195,6 +218,66 @@ export default function PracticeSession({
     onSessionComplete?.()
   }, [berries, onSessionComplete, session])
 
+  const applyRealtimeToolResult = useCallback(async (event) => {
+    const response = event?.result || {}
+    const result = response.result || {}
+
+    if (event?.name === 'end_lesson' && result.end) {
+      await finishSession()
+      return
+    }
+
+    const nextExercise = response.exercise || result.next_exercise
+    if (nextExercise) {
+      setSession((current) => sessionWithExercise(current, nextExercise))
+    }
+
+    if (event?.name === 'switch_topic') {
+      setFeedback(result.message || 'A fresh adventure is ready!')
+      dispatch({
+        type: 'transition',
+        phase: SESSION_PHASES.ready,
+        message: result.message || copy.newAdventure,
+      })
+      await restoreHandsFreeListening(copy.listening)
+      return
+    }
+
+    if (event?.name !== 'complete_turn') return
+
+    const reply = result.reply_hint || 'I heard you. Let’s keep the story going!'
+    setFeedback(reply)
+    dispatch({
+      type: 'transition',
+      phase: SESSION_PHASES.scoring,
+      message: 'Pip is thinking about that brave try…',
+    })
+    dispatch({
+      type: 'transition',
+      phase: SESSION_PHASES.feedback,
+      message: reply,
+    })
+
+    if ((result.xp_earned || 0) > 0) {
+      setBerries((value) => value + 1)
+      setBerryFlight((value) => value + 1)
+      sfx.correct()
+    }
+
+    if (result.lesson_complete) {
+      await finishSession()
+      return
+    }
+
+    dispatch({
+      type: 'transition',
+      phase: SESSION_PHASES.listening,
+      incrementTurn: Boolean(result.advance),
+      message: copy.listening,
+    })
+  }, [copy.listening, copy.newAdventure, finishSession, restoreHandsFreeListening])
+  realtimeToolResultRef.current = applyRealtimeToolResult
+
   const moveToNextTurn = useCallback(async (result) => {
     const move = result?.coach?.move
     const retryCap = session?.target?.retry_cap || 3
@@ -224,24 +307,7 @@ export default function PracticeSession({
 
     const nextExercise = result?.next_exercise
     if (nextExercise) {
-      const word = nextExercise.expected_text || nextExercise.display_label || promptWord
-      setSession((current) => ({
-        ...current,
-        exercise: nextExercise,
-        target: {
-          ...(current?.target || {}),
-          target_id: nextExercise.id || current?.target?.target_id,
-          phoneme: nextExercise.target_phoneme || current?.target?.phoneme,
-          prompts: [{
-            word,
-            prompt: nextExercise.prompt || `Say ${word}`,
-            image_url: nextExercise.image_url,
-            cue: nextExercise.cue || nextExercise.placement_cue,
-          }],
-          cue: nextExercise.cue || nextExercise.placement_cue || current?.target?.cue,
-          model_lines: nextExercise.model_lines || [],
-        },
-      }))
+      setSession((current) => sessionWithExercise(current, nextExercise))
     }
 
     setAttempt(1)
@@ -356,6 +422,7 @@ export default function PracticeSession({
     return voice.subscribe((event) => {
       if (event.type === 'state') setVoiceState(event.state)
       if (event.type === 'utterance') processTurnRef.current?.(event.blob)
+      if (event.type === 'tool-result') realtimeToolResultRef.current?.(event)
     })
   }, [])
 

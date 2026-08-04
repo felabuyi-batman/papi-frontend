@@ -108,3 +108,19 @@ test('PracticeSession stays voice-first for conversation turns', () => {
   assert.match(practiceSource, /restoreHandsFreeListening/)
   assert.match(practiceSource, /beginCapture\(\{ maxMs: 5200 \}\)/)
 })
+
+test('Realtime conversation produces one synchronized teaching response per child turn', () => {
+  const voiceSource = readSrc('src/voice/ChildVoiceSession.js')
+  const practiceSource = readSrc('src/child/PracticeSession.jsx')
+  const speechStartedBlock = voiceSource.slice(
+    voiceSource.indexOf("payload.type === 'input_audio_buffer.speech_started'"),
+    voiceSource.indexOf("payload.type === 'input_audio_buffer.speech_stopped'"),
+  )
+
+  assert.match(speechStartedBlock, /if \(!this\.automaticResponses\)/)
+  assert.match(voiceSource, /processedToolCallIds\.has\(callKey\)/)
+  assert.match(voiceSource, /session: \{ instructions: toolResult\.instructions \}/)
+  assert.match(practiceSource, /event\.type === 'tool-result'/)
+  assert.match(practiceSource, /result\.reply_hint/)
+  assert.match(practiceSource, /result\.lesson_complete/)
+})

@@ -57,6 +57,8 @@ export class ChildVoiceSession {
     this.pendingResponseText = ''
     this.browserSpeechRecognition = null
     this.browserCaptureTranscript = ''
+    this.automaticResponses = false
+    this.processedToolCallIds = new Set()
   }
 
   #browserSpeechRecognitionConstructor() {
@@ -147,6 +149,8 @@ export class ChildVoiceSession {
   }) {
     this.sessionId = sessionId || this.sessionId
     this.language = language || 'en'
+    this.automaticResponses = Boolean(automaticResponses)
+    this.processedToolCallIds.clear()
     if (this.connected && this.dataChannel?.readyState === 'open') return this.snapshot
     if (this.connectPromise) return this.connectPromise
 
@@ -389,18 +393,24 @@ export class ChildVoiceSession {
     }
     if (payload.type === 'input_audio_buffer.speech_started' && this.handsFree) {
       // A child always wins the floor. Stop ElevenLabs immediately and cancel
-      // any OpenAI text generation still in flight before recording the turn.
+      // any OpenAI text generation still in flight. In conversational mode,
+      // Realtime owns transcription + complete_turn; recording and submitting
+      // the same turn separately would create a second competing coach reply.
       this.#interruptCoachSpeech()
       this.#send({ type: 'response.cancel' })
       this.childSpeaking = true
-      this.beginCapture({ maxMs: 5000 }).catch(() => {})
+      if (!this.automaticResponses) {
+        this.beginCapture({ maxMs: 5000 }).catch(() => {})
+      }
       this.emitState()
     }
     if (payload.type === 'input_audio_buffer.speech_stopped' && this.handsFree) {
       this.childSpeaking = false
-      this.endCapture().then((blob) => {
-        if (blob?.size) this.emit({ type: 'utterance', blob })
-      })
+      if (!this.automaticResponses) {
+        this.endCapture().then((blob) => {
+          if (blob?.size) this.emit({ type: 'utterance', blob })
+        })
+      }
       this.emitState()
     }
     if (payload.type === 'error') {
@@ -431,13 +441,26 @@ export class ChildVoiceSession {
     ) {
       const name = payload.name || payload.item?.name
       const callId = payload.call_id || payload.item?.call_id
+      const callKey = callId || `${name || 'tool'}:${payload.arguments || payload.item?.arguments || ''}`
       let args = {}
       try {
         args = JSON.parse(payload.arguments || payload.item?.arguments || '{}')
       } catch { args = {} }
-      if (name && this.sessionId && this.api.realtimeTool) {
+      if (
+        name
+        && this.sessionId
+        && this.api.realtimeTool
+        && !this.processedToolCallIds.has(callKey)
+      ) {
+        this.processedToolCallIds.add(callKey)
         this.api.realtimeTool(this.sessionId, name, args)
           .then((toolResult) => {
+            if (toolResult?.instructions) {
+              this.#send({
+                type: 'session.update',
+                session: { instructions: toolResult.instructions },
+              })
+            }
             this.emit({ type: 'tool-result', name, result: toolResult })
             if (callId && this.#send({
               type: 'conversation.item.create',
@@ -580,6 +603,8 @@ export class ChildVoiceSession {
     this.connected = false
     this.speaking = false
     this.childSpeaking = false
+    this.automaticResponses = false
+    this.processedToolCallIds.clear()
     this.emitState()
   }
 }
