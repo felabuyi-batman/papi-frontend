@@ -230,7 +230,7 @@ export function ParentAuth({ onDone, onBack, initialMode = 'signin' }) {
           </button>
           <button
             type="button"
-            className="nest__back nest__field--quiet"
+            className="nest-auth__text-btn"
             onClick={() => setMode('signin')}
           >
             I confirmed — sign in
@@ -348,7 +348,7 @@ export function ParentAuth({ onDone, onBack, initialMode = 'signin' }) {
         {!isForgot && !isSignup && (
           <button
             type="button"
-            className="nest__back nest__field--quiet"
+            className="nest-auth__text-btn"
             disabled={busy}
             onClick={() => {
               setErr(null)
@@ -365,7 +365,7 @@ export function ParentAuth({ onDone, onBack, initialMode = 'signin' }) {
 
         <button
           type="button"
-          className="nest__back nest__field--quiet"
+          className="nest-auth__text-btn"
           disabled={busy}
           onClick={() => {
             setErr(null)
