@@ -5,7 +5,6 @@ import {
   getSupabaseSession,
   resendSignupConfirmation,
   signInWithEmail,
-  signUpWithEmail,
   supabase,
   supabaseConfigured,
 } from '../supabase.js'
@@ -97,42 +96,73 @@ export function ParentAuth({ onDone, onBack }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function finishWithSession() {
-    await api.acceptSupabaseSession()
-    onDone()
-  }
-
   async function submit(event) {
     event?.preventDefault?.()
     setBusy(true)
     setErr(null)
     setNote(null)
     try {
-      if (!supabaseConfigured()) {
-        throw new Error('Sign-in is not configured yet (missing Supabase keys).')
-      }
       const online = await api.health()
       setApiOnline(online)
       if (!online) {
         throw new Error('Pipa’s secure service is taking a short pause. Please try again in a moment.')
       }
-      if (!turnstileSiteKey() || !turnstileToken) {
+      // Turnstile is client bot friction; SpeechC register/login does not require it server-side.
+      if (turnstileSiteKey() && !turnstileToken) {
         throw new Error('Complete the Cloudflare security check, then try again.')
       }
 
+      const cleanEmail = String(email || '').trim().toLowerCase()
+      const cleanPassword = String(password || '')
+      if (!cleanEmail || !cleanPassword) {
+        throw new Error('Email and password are required.')
+      }
+      if (cleanPassword.length < 8) {
+        throw new Error('Password must be at least 8 characters.')
+      }
+
+      // Primary path: SpeechC email/password — unlocks immediately (no verification email).
+      // Supabase confirm-email was stranding parents when mail never arrived and
+      // unconfirmed accounts looked like a wrong password on sign-in.
       if (mode === 'signup') {
-        const result = await signUpWithEmail(email, password, turnstileToken)
-        if (result.needsEmailConfirmation) {
-          setMode('check-email')
-          setNote('We sent a confirmation link. Open it to unlock your nest.')
-          return
+        try {
+          await api.register(cleanEmail, cleanPassword)
+        } catch (error) {
+          const message = String(error?.message || error || '')
+          if (/already registered|already exists|409/i.test(message)) {
+            throw new Error('That email already has a nest. Sign in instead.')
+          }
+          throw error
         }
-        await finishWithSession()
+        onDone()
         return
       }
 
-      await signInWithEmail(email, password, turnstileToken)
-      await finishWithSession()
+      try {
+        await api.login(cleanEmail, cleanPassword)
+        onDone()
+        return
+      } catch (speechcError) {
+        // Legacy: parents who finished Supabase email confirm before this cutover.
+        if (!supabaseConfigured() || !turnstileToken) throw speechcError
+        try {
+          await signInWithEmail(cleanEmail, cleanPassword, turnstileToken)
+          await api.acceptSupabaseSession()
+          onDone()
+          return
+        } catch (supabaseError) {
+          const supabaseMessage = String(supabaseError?.message || '')
+          if (/confirm your email|email not confirmed/i.test(supabaseMessage)) {
+            setMode('check-email')
+            setNote('Your older signup still needs the confirmation link — or create a fresh nest with Sign up.')
+            setErr(supabaseMessage)
+            return
+          }
+          throw new Error(
+            'Email or password looks wrong. If you signed up earlier and never got a confirmation email, tap Sign up again with the same address — or use a new email.',
+          )
+        }
+      }
     } catch (error) {
       setErr(error.message)
       setTurnstileToken('')
@@ -166,8 +196,9 @@ export function ParentAuth({ onDone, onBack }) {
         <p className="nest__kicker">Check your inbox</p>
         <h1 className="nest__title">Confirm your email.</h1>
         <p className="nest__lede">
-          We sent a link to <strong>{email}</strong>. Tap it — it opens your nest automatically.
-          If nothing opens, come back here and sign in.
+          We may have sent a link to <strong>{email}</strong> from an older signup.
+          Prefer a faster unlock? Go back and use <strong>Sign up</strong> again —
+          your nest opens immediately with email and password (no inbox wait).
         </p>
         <div className="nest__panel">
           {note && <p className="nest__note">{note}</p>}
@@ -279,7 +310,7 @@ export function ParentAuth({ onDone, onBack }) {
         )}
         {err && <p className="nest__error">{err}</p>}
         <p className="nest__note">
-          Email verification keeps each family’s progress private.
+          Your nest unlocks right away — keep this email and password safe for return visits.
         </p>
       </form>
     </NestShell>
