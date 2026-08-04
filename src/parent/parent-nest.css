@@ -716,7 +716,19 @@
 .nest-auth__trust dd { display: grid; gap: 4px; margin: 0; }
 .nest-auth__trust strong { color: #fff; font-size: .86rem; }
 .nest-auth__trust span { color: rgba(255,255,255,.58); font-size: .75rem; line-height: 1.35; }
-.nest--auth .nest-auth__panel { align-self: center; justify-self: center; width: min(480px, calc(100% - 64px)); padding: 0; gap: 20px; border: 0; border-radius: 0; background: transparent; box-shadow: none; backdrop-filter: none; }
+.nest--auth .nest-auth__panel {
+  align-self: center;
+  justify-self: center;
+  width: min(480px, calc(100% - 64px));
+  padding: 0;
+  gap: 20px;
+  border: 0;
+  border-radius: 0;
+  /* Keep the form on a light surface so dark labels/links stay readable. */
+  background: #f5f8f3;
+  box-shadow: none;
+  backdrop-filter: none;
+}
 .nest--auth .nest-auth__panel::before { content: 'Private parent access'; color: #547067; font: 800 .74rem/1.2 var(--font-body); letter-spacing: .08em; text-transform: uppercase; }
 .nest--auth .nest__main::after { content: ''; position: absolute; z-index: -1; inset: 0 0 0 55%; background: #f5f8f3; }
 .nest--auth .nest-auth__panel-head span { display: none; }
@@ -755,13 +767,20 @@
 .nest--auth .nest__note { color: #64766f; border-color: #d5ded8; }
 
 @media (max-width: 900px) {
-  .nest--auth .nest__main { grid-template-columns: 1fr; }
-  .nest--auth .nest__main::after { inset: 48% 0 0; }
+  .nest--auth .nest__main { grid-template-columns: 1fr; background: #f5f8f3; }
+  .nest--auth .nest__main::after { inset: 0; background: #f5f8f3; }
   .nest-auth__intro { min-height: 48dvh; padding: 110px 24px 30px; }
   .nest--auth .nest__title { font-size: clamp(3.3rem, 12vw, 5rem); }
   .nest-auth__portrait { right: -20px; bottom: 12px; width: min(38vw, 260px); }
   .nest-auth__trust { display: none; }
-  .nest--auth .nest-auth__panel { min-height: 52dvh; align-content: center; width: min(520px, calc(100% - 40px)); padding: 54px 0 36px; }
+  .nest--auth .nest-auth__panel {
+    min-height: 52dvh;
+    align-content: center;
+    width: 100%;
+    max-width: none;
+    padding: 36px 24px 48px;
+    background: #f5f8f3;
+  }
 }
 
 @media (max-width: 520px) {
