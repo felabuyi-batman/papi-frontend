@@ -64,6 +64,11 @@ export default function App() {
           return
         }
       }
+      if (kids.length === 1) {
+        setActive(kids[0])
+        setView('dashboard')
+        return
+      }
       setView(kids.length ? 'roster' : 'add')
     } catch (error) {
       console.error('Failed to load children after auth', error)

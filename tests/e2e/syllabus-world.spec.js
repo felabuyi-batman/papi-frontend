@@ -276,7 +276,7 @@ async function openParentDashboard(page, stage) {
   await page.goto('/')
   await page.getByRole('button', { name: /grown-ups/i }).first().click()
   // ParentAuth resumes from the injected token (Google OAuth skipped in e2e).
-  await page.getByRole('button', { name: /Sam/ }).click()
+  await expect(page.getByRole('heading', { name: /Sam is finding their voice/i })).toBeVisible()
 }
 
 async function openChildExperience(page, stage) {
