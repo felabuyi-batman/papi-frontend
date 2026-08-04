@@ -9,6 +9,7 @@ import {
   ParentAuth,
   ParentDashboard,
   ParentRoster,
+  PasswordReset,
 } from './parent/ParentNest.jsx'
 import SlpNest from './parent/SlpNest.jsx'
 import Landing from './Landing.jsx'
@@ -22,6 +23,7 @@ const DEMO_CHILD = {
 
 function viewFromPathname(pathname = '/') {
   if (pathname.startsWith('/auth/callback')) return 'auth-callback'
+  if (pathname.startsWith('/auth/reset')) return 'auth-reset'
   if (pathname === '/privacy' || pathname === '/privacy/') return 'privacy'
   if (pathname === '/terms' || pathname === '/terms/') return 'terms'
   return 'landing'
@@ -114,6 +116,21 @@ export default function App() {
   if (view === 'auth-callback') {
     return (
       <AuthCallback
+        onDone={async () => {
+          window.history.replaceState({}, '', '/')
+          await loadKids()
+        }}
+        onBack={() => {
+          window.history.replaceState({}, '', '/')
+          setView('auth')
+        }}
+      />
+    )
+  }
+
+  if (view === 'auth-reset') {
+    return (
+      <PasswordReset
         onDone={async () => {
           window.history.replaceState({}, '', '/')
           await loadKids()

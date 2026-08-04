@@ -119,6 +119,17 @@ export async function resendSignupConfirmation(email) {
   if (error) throw new Error(friendlyAuthError(error))
 }
 
+/** Best-effort legacy Supabase recovery email (SpeechC owns primary passwords now). */
+export async function requestPasswordResetEmail(email, captchaToken) {
+  const cleanEmail = String(email || '').trim().toLowerCase()
+  if (!cleanEmail) throw new Error('Enter your email to reset the password.')
+  const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+    redirectTo: `${window.location.origin}/auth/reset`,
+    captchaToken,
+  })
+  if (error) throw new Error(friendlyAuthError(error))
+}
+
 export async function getSupabaseSession() {
   const { data, error } = await supabase.auth.getSession()
   if (error) throw error

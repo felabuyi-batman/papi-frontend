@@ -49,8 +49,8 @@ function NestBack({ children, onClick }) {
   )
 }
 
-export function ParentAuth({ onDone, onBack }) {
-  const [mode, setMode] = useState('signin') // signin | signup | check-email
+export function ParentAuth({ onDone, onBack, initialMode = 'signin' }) {
+  const [mode, setMode] = useState(initialMode) // signin | signup | check-email | forgot | forgot-sent
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
@@ -114,7 +114,29 @@ export function ParentAuth({ onDone, onBack }) {
 
       const cleanEmail = String(email || '').trim().toLowerCase()
       const cleanPassword = String(password || '')
-      if (!cleanEmail || !cleanPassword) {
+      if (!cleanEmail) {
+        throw new Error('Email is required.')
+      }
+
+      if (mode === 'forgot') {
+        const result = await api.forgotPassword(cleanEmail)
+        // Local/dev APIs may return the link when Resend is not configured.
+        if (result?.dev_reset_url && typeof window !== 'undefined') {
+          try {
+            const url = new URL(result.dev_reset_url, window.location.origin)
+            window.history.pushState({}, '', `${url.pathname}${url.search}`)
+            window.dispatchEvent(new PopStateEvent('popstate'))
+            return
+          } catch {
+            /* fall through to inbox message */
+          }
+        }
+        setMode('forgot-sent')
+        setNote(result?.message || 'If that email has a nest, a reset link is on the way.')
+        return
+      }
+
+      if (!cleanPassword) {
         throw new Error('Email and password are required.')
       }
       if (cleanPassword.length < 8) {
@@ -159,7 +181,7 @@ export function ParentAuth({ onDone, onBack }) {
             return
           }
           throw new Error(
-            'Email or password looks wrong. If you signed up earlier and never got a confirmation email, tap Sign up again with the same address — or use a new email.',
+            'Email or password looks wrong. Use Forgot password, or Sign up again if you never finished an older confirmation email.',
           )
         }
       }
@@ -218,7 +240,32 @@ export function ParentAuth({ onDone, onBack }) {
     )
   }
 
+  if (mode === 'forgot-sent') {
+    return (
+      <NestShell
+        onBrandClick={onBack}
+        topRight={<NestBack onClick={onBack}>Back to play</NestBack>}
+        pageClassName="nest--auth"
+      >
+        <p className="nest__kicker">Check your inbox</p>
+        <h1 className="nest__title">Reset link sent.</h1>
+        <p className="nest__lede">
+          If <strong>{email}</strong> has a nest, open the email and choose a new password.
+          The link expires in one hour.
+        </p>
+        <div className="nest__panel">
+          {note && <p className="nest__note">{note}</p>}
+          {err && <p className="nest__error">{err}</p>}
+          <button type="button" className="nest__primary" onClick={() => setMode('signin')}>
+            Back to sign in
+          </button>
+        </div>
+      </NestShell>
+    )
+  }
+
   const isSignup = mode === 'signup'
+  const isForgot = mode === 'forgot'
 
   return (
     <NestShell
@@ -230,11 +277,19 @@ export function ParentAuth({ onDone, onBack }) {
       <div className="nest-auth__intro">
         <div className="nest-auth__story">
           <p className="nest__kicker">The grown-up nest</p>
-          <h1 className="nest__title">{isSignup ? 'Create a calmer practice rhythm.' : 'Open your nest.'}</h1>
+          <h1 className="nest__title">
+            {isForgot
+              ? 'Reset your password.'
+              : isSignup
+                ? 'Create a calmer practice rhythm.'
+                : 'Open your nest.'}
+          </h1>
           <p className="nest__lede">
-            {isSignup
-              ? 'Set up one private place for practice plans, recommendations, and every small win.'
-              : 'See what is clicking, what needs support, and the best next activity for your child.'}
+            {isForgot
+              ? 'Enter the email for your nest. We’ll send a one-hour reset link.'
+              : isSignup
+                ? 'Set up one private place for practice plans, recommendations, and every small win.'
+                : 'See what is clicking, what needs support, and the best next activity for your child.'}
           </p>
         </div>
         <div className="nest-auth__portrait" aria-hidden="true">
@@ -249,8 +304,8 @@ export function ParentAuth({ onDone, onBack }) {
 
       <form className="nest__panel nest-auth__panel" onSubmit={submit}>
         <div className="nest-auth__panel-head">
-          <span>{isSignup ? 'New family' : 'Parent sign in'}</span>
-          <strong>{isSignup ? 'Start your nest' : 'Open your nest'}</strong>
+          <span>{isForgot ? 'Password help' : isSignup ? 'New family' : 'Parent sign in'}</span>
+          <strong>{isForgot ? 'Forgot password' : isSignup ? 'Start your nest' : 'Open your nest'}</strong>
         </div>
         <label className="nest__field">
           <span>Email</span>
@@ -262,20 +317,22 @@ export function ParentAuth({ onDone, onBack }) {
             onChange={(event) => setEmail(event.target.value)}
           />
         </label>
-        <label className="nest__field">
-          <span>Password</span>
-          <input
-            type="password"
-            autoComplete={isSignup ? 'new-password' : 'current-password'}
-            required
-            minLength={8}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-        </label>
+        {!isForgot && (
+          <label className="nest__field">
+            <span>Password</span>
+            <input
+              type="password"
+              autoComplete={isSignup ? 'new-password' : 'current-password'}
+              required
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
+        )}
 
         <TurnstileVerifier
-          action={isSignup ? 'signup' : 'login'}
+          action={isForgot ? 'forgot' : isSignup ? 'signup' : 'login'}
           onToken={setTurnstileToken}
           resetKey={turnstileResetKey}
         />
@@ -283,10 +340,28 @@ export function ParentAuth({ onDone, onBack }) {
         <button
           type="submit"
           className="nest__primary"
-          disabled={busy || apiOnline === false || !turnstileToken}
+          disabled={busy || apiOnline === false || (Boolean(turnstileSiteKey()) && !turnstileToken)}
         >
-          {busy ? 'Working…' : isSignup ? 'Sign up' : 'Sign in'}
+          {busy ? 'Working…' : isForgot ? 'Send reset link' : isSignup ? 'Sign up' : 'Sign in'}
         </button>
+
+        {!isForgot && !isSignup && (
+          <button
+            type="button"
+            className="nest__back nest__field--quiet"
+            disabled={busy}
+            onClick={() => {
+              setErr(null)
+              setNote(null)
+              setMode('forgot')
+              setPassword('')
+              setTurnstileToken('')
+              setTurnstileResetKey((value) => value + 1)
+            }}
+          >
+            Forgot password?
+          </button>
+        )}
 
         <button
           type="button"
@@ -295,12 +370,16 @@ export function ParentAuth({ onDone, onBack }) {
           onClick={() => {
             setErr(null)
             setNote(null)
-            setMode(isSignup ? 'signin' : 'signup')
+            setMode(isForgot || isSignup ? 'signin' : 'signup')
             setTurnstileToken('')
             setTurnstileResetKey((value) => value + 1)
           }}
         >
-          {isSignup ? 'Already have a nest? Sign in' : 'New here? Sign up'}
+          {isForgot
+            ? 'Back to sign in'
+            : isSignup
+              ? 'Already have a nest? Sign in'
+              : 'New here? Sign up'}
         </button>
 
         {apiOnline === false && (
@@ -310,8 +389,85 @@ export function ParentAuth({ onDone, onBack }) {
         )}
         {err && <p className="nest__error">{err}</p>}
         <p className="nest__note">
-          Your nest unlocks right away — keep this email and password safe for return visits.
+          {isForgot
+            ? 'Check spam too — the reset link expires in one hour.'
+            : 'Your nest unlocks right away — keep this email and password safe for return visits.'}
         </p>
+      </form>
+    </NestShell>
+  )
+}
+
+export function PasswordReset({ onDone, onBack }) {
+  const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState(null)
+  const [token, setToken] = useState('')
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search || '')
+      setToken(params.get('token') || '')
+    } catch {
+      setToken('')
+    }
+  }, [])
+
+  async function submit(event) {
+    event?.preventDefault?.()
+    setBusy(true)
+    setErr(null)
+    try {
+      if (!token) throw new Error('This reset link is missing its token. Request a new one from Sign in.')
+      if (password.length < 8) throw new Error('Password must be at least 8 characters.')
+      if (password !== confirm) throw new Error('Passwords do not match.')
+      await api.resetPassword(token, password)
+      window.history.replaceState({}, '', '/')
+      await onDone()
+    } catch (error) {
+      setErr(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <NestShell
+      onBrandClick={onBack}
+      topRight={<NestBack onClick={onBack}>Back</NestBack>}
+      pageClassName="nest--auth"
+    >
+      <p className="nest__kicker">Password</p>
+      <h1 className="nest__title">Choose a new password.</h1>
+      <p className="nest__lede">Pick something memorable for this nest — at least 8 characters.</p>
+      <form className="nest__panel nest-auth__panel" onSubmit={submit}>
+        <label className="nest__field">
+          <span>New password</span>
+          <input
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+        </label>
+        <label className="nest__field">
+          <span>Confirm password</span>
+          <input
+            type="password"
+            autoComplete="new-password"
+            required
+            minLength={8}
+            value={confirm}
+            onChange={(event) => setConfirm(event.target.value)}
+          />
+        </label>
+        <button type="submit" className="nest__primary" disabled={busy || !token}>
+          {busy ? 'Saving…' : 'Save password and open nest'}
+        </button>
+        {err && <p className="nest__error">{err}</p>}
       </form>
     </NestShell>
   )

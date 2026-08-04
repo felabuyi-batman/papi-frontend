@@ -327,6 +327,20 @@ export const api = {
   login: (email, password) =>
     req('/auth/login', { method: 'POST', json: { email, password } }).then(rememberAuth),
 
+  forgotPassword: (email) => req('/auth/forgot-password', {
+    method: 'POST',
+    json: {
+      email,
+      return_origin: typeof window !== 'undefined' ? window.location.origin : undefined,
+    },
+  }),
+
+  resetPassword: (token, password) =>
+    req('/auth/reset-password', {
+      method: 'POST',
+      json: { token, password },
+    }).then(rememberAuth),
+
   logout: async () => {
     try {
       await signOutSupabase()
