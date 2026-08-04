@@ -13,6 +13,7 @@ import {
   sessionReducer,
   stageForSession,
 } from '../src/child/sessionMachine.js'
+import { childCopy } from '../src/child/i18n.js'
 
 const root = path.dirname(fileURLToPath(import.meta.url))
 const readSrc = (relativePath) => readFileSync(path.join(root, '..', relativePath), 'utf8')
@@ -104,7 +105,7 @@ test('PracticeSession stays voice-first for conversation turns', () => {
   const practiceSource = readSrc('src/child/PracticeSession.jsx')
   assert.match(practiceSource, /shouldUseSelfRating = false/)
   assert.doesNotMatch(practiceSource, /syllabus-mic/)
-  assert.match(practiceSource, /automaticResponses: conversationalStage/)
+  assert.match(practiceSource, /automaticResponses: useConversationalLesson/)
   assert.match(practiceSource, /restoreHandsFreeListening/)
   assert.match(practiceSource, /beginCapture\(\{ maxMs: 5200 \}\)/)
 })
@@ -123,4 +124,19 @@ test('Realtime conversation produces one synchronized teaching response per chil
   assert.match(practiceSource, /event\.type === 'tool-result'/)
   assert.match(practiceSource, /result\.reply_hint/)
   assert.match(practiceSource, /result\.lesson_complete/)
+})
+
+test('Conversational lessons ask the child’s name before the first exercise', () => {
+  const practiceSource = readSrc('src/child/PracticeSession.jsx')
+  const voiceSource = readSrc('src/voice/ChildVoiceSession.js')
+  for (const language of ['en', 'es', 'fr', 'ar', 'zh']) {
+    const opening = childCopy(language).nameOpening
+    assert.ok(opening)
+    assert.match(opening, /\?|\؟|？/)
+  }
+  assert.match(practiceSource, /voice\.markOpeningDone\(\)/)
+  assert.match(practiceSource, /await voice\.speak\(copy\.nameOpening\)/)
+  assert.match(voiceSource, /OPENING ALREADY DONE/)
+  assert.match(voiceSource, /switch_topic/)
+  assert.match(practiceSource, /event\?\.name === 'set_child_name'/)
 })

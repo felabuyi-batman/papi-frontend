@@ -2,6 +2,7 @@ const CHILD_COPY = {
   en: {
     back: 'Back', coachSays: 'PIP SAYS', listening: 'I’m listening…', thinking: 'Pip is thinking…',
     reconnecting: 'Pip is reconnecting to the nest…', ready: 'You can start talking.',
+    nameOpening: 'Hi! I’m Pipa. What’s your name?',
     numberNest: 'Number nest', numberKicker: 'NUMBER NEST', defaultMathPrompt: 'How many berries?',
     countOpening: (name) => `Hi ${name}! Let’s count with Pip.`,
     silence: 'I’m listening. Say the number when you’re ready.',
@@ -18,6 +19,7 @@ const CHILD_COPY = {
   fr: {
     back: 'Retour', coachSays: 'PAPI DIT', listening: 'Je t’écoute…', thinking: 'Papi réfléchit…',
     reconnecting: 'Papi se reconnecte au nid…', ready: 'Tu peux commencer à parler.',
+    nameOpening: 'Salut ! Je suis Pipa. Comment tu t’appelles ?',
     numberNest: 'Le nid des nombres', numberKicker: 'LE NID DES NOMBRES', defaultMathPrompt: 'Combien y a-t-il de baies ?',
     countOpening: (name) => `Bonjour ${name} ! Comptons avec Papi.`,
     silence: 'Je t’écoute. Dis le nombre quand tu es prêt.',
@@ -34,6 +36,7 @@ const CHILD_COPY = {
   es: {
     back: 'Volver', coachSays: 'PAPI DICE', listening: 'Te escucho…', thinking: 'Papi está pensando…',
     reconnecting: 'Papi se está reconectando al nido…', ready: 'Puedes empezar a hablar.',
+    nameOpening: '¡Hola! Soy Pipa. ¿Cómo te llamas?',
     numberNest: 'Nido de números', numberKicker: 'NIDO DE NÚMEROS', defaultMathPrompt: '¿Cuántas bayas hay?',
     countOpening: (name) => `¡Hola, ${name}! Contemos con Papi.`,
     silence: 'Te escucho. Di el número cuando estés listo.',
@@ -50,6 +53,7 @@ const CHILD_COPY = {
   ar: {
     back: 'رجوع', coachSays: 'بابي بيقول', listening: 'عم اسمعك…', thinking: 'بابي عم يفكّر…',
     reconnecting: 'بابي عم يرجع يتصل بالعش…', ready: 'بلّش احكي لما تكون جاهز.',
+    nameOpening: 'مرحباً! أنا بيبا. ما اسمك؟',
     numberNest: 'عش الأرقام', numberKicker: 'عش الأرقام', defaultMathPrompt: 'قدّيش في حبّات توت؟',
     countOpening: (name) => `أهلا ${name}! يلا نعدّ مع بابي.`,
     silence: 'عم اسمعك. قول الرقم لما تكون جاهز.',
@@ -66,6 +70,7 @@ const CHILD_COPY = {
   zh: {
     back: '返回', coachSays: 'PAPI 说', listening: '我在听…', thinking: 'Papi 正在想…',
     reconnecting: 'Papi 正在重新连接…', ready: '准备好就可以直接说话。',
+    nameOpening: '嗨！我是 Pipa。你叫什么名字？',
     numberNest: '数字小窝', numberKicker: '数字小窝', defaultMathPrompt: '这里有多少颗莓果？',
     countOpening: (name) => `你好，${name}！我们和 Papi 一起数数吧。`,
     silence: '我在听。准备好就说出数字。',

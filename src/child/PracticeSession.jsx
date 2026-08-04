@@ -227,17 +227,28 @@ export default function PracticeSession({
       return
     }
 
+    if (event?.name === 'set_child_name' && (result.name || response.child_name)) {
+      const spokenName = result.name || response.child_name
+      setFeedback(`Nice to meet you, ${spokenName}!`)
+      dispatch({
+        type: 'transition',
+        phase: SESSION_PHASES.listening,
+        message: copy.listening,
+      })
+      return
+    }
+
     const nextExercise = response.exercise || result.next_exercise
     if (nextExercise) {
       setSession((current) => sessionWithExercise(current, nextExercise))
     }
 
-    if (event?.name === 'switch_topic') {
-      setFeedback(result.message || 'A fresh adventure is ready!')
+    if (event?.name === 'switch_topic' || result.switched || result.skipped_same_picture) {
+      setFeedback(result.message || result.reply_hint || 'A fresh adventure is ready!')
       dispatch({
         type: 'transition',
         phase: SESSION_PHASES.ready,
-        message: result.message || copy.newAdventure,
+        message: result.message || result.reply_hint || copy.newAdventure,
       })
       await restoreHandsFreeListening(copy.listening)
       return
@@ -442,38 +453,42 @@ export default function PracticeSession({
         })
         const resolvedStage = stageForSession({ recommendedMode, session: sessionPayload })
         const conversationalStage = resolvedStage === 'live' || resolvedStage === 'conversation'
+        // Conversational coaching is the primary lesson path: name first, then
+        // curriculum targets (sound → syllable → word pictures → phrase/sentence).
+        const useConversationalLesson = conversationalStage || recommendedMode === 'conversation'
         const voiceConnection = voice.connect({
           childId: child.id,
           sessionId: sessionPayload.session_id,
-          mode: conversationalStage ? 'conversation' : 'practice',
-          automaticResponses: conversationalStage,
+          mode: useConversationalLesson ? 'conversation' : 'practice',
+          automaticResponses: useConversationalLesson,
           language: child.language || engagement?.language || 'en',
         })
-        await voice.speak(
-          sessionPayload.episode?.opening
-          || engagement?.greeting
-          || `Hi ${child.display_name}! Let’s play with sounds.`,
-        )
-        if (cancelled) return
-        if (
-          !conversationalStage
-          && (resolvedStage === 'model_imitate' || sessionPayload.exercise?.model_lines?.length)
-        ) {
-          dispatch({
-            type: 'transition',
-            phase: SESSION_PHASES.modeling,
-            message: copy.modeling,
-          })
-          const modelLine = String(
-            sessionPayload.exercise?.model_lines?.[0]
-            || sessionPayload.target?.prompts?.[0]?.word
-            || sessionPayload.target?.phoneme
-            || 'sss',
-          )
-          await voice.speak(modelLine)
-        }
-        if (cancelled) return
         const connectionState = await voiceConnection
+        if (cancelled) return
+        if (useConversationalLesson) {
+          voice.markOpeningDone()
+          await voice.speak(copy.nameOpening)
+        } else {
+          await voice.speak(
+            sessionPayload.episode?.opening
+            || engagement?.greeting
+            || `Hi ${child.display_name}! Let’s play with sounds.`,
+          )
+          if (resolvedStage === 'model_imitate' || sessionPayload.exercise?.model_lines?.length) {
+            dispatch({
+              type: 'transition',
+              phase: SESSION_PHASES.modeling,
+              message: copy.modeling,
+            })
+            const modelLine = String(
+              sessionPayload.exercise?.model_lines?.[0]
+              || sessionPayload.target?.prompts?.[0]?.word
+              || sessionPayload.target?.phoneme
+              || 'sss',
+            )
+            await voice.speak(modelLine)
+          }
+        }
         if (cancelled) return
         const handsFreeReady = connectionState.connected
         voice.setHandsFree(handsFreeReady)
@@ -494,7 +509,7 @@ export default function PracticeSession({
       cancelled = true
       voice.disconnect()
     }
-  }, [child.id, child.display_name, copy.listening, copy.modeling, engagement?.greeting, engagement?.language, recommendedMode, restoreHandsFreeListening])
+  }, [child.id, child.display_name, copy.listening, copy.modeling, copy.nameOpening, engagement?.greeting, engagement?.language, recommendedMode, restoreHandsFreeListening])
 
   useEffect(() => {
     const nextPrompt = prompts[(promptIndex + 1) % Math.max(1, prompts.length)]

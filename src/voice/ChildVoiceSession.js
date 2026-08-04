@@ -59,6 +59,7 @@ export class ChildVoiceSession {
     this.browserCaptureTranscript = ''
     this.automaticResponses = false
     this.processedToolCallIds = new Set()
+    this.sessionInstructions = ''
   }
 
   #browserSpeechRecognitionConstructor() {
@@ -151,6 +152,7 @@ export class ChildVoiceSession {
     this.language = language || 'en'
     this.automaticResponses = Boolean(automaticResponses)
     this.processedToolCallIds.clear()
+    this.sessionInstructions = ''
     if (this.connected && this.dataChannel?.readyState === 'open') return this.snapshot
     if (this.connectPromise) return this.connectPromise
 
@@ -176,6 +178,7 @@ export class ChildVoiceSession {
 
   async #connectRealtime({ childId, sessionId, mode, automaticResponses, language }) {
     const config = await this.api.realtimeSession(sessionId || childId, mode, { sessionId })
+    this.sessionInstructions = String(config?.instructions || '')
     if (!config?.ephemeral_token) {
       this.fallback = true
       this.connected = false
@@ -482,6 +485,25 @@ export class ChildVoiceSession {
     if (this.dataChannel?.readyState !== 'open') return false
     this.dataChannel.send(JSON.stringify(payload))
     return true
+  }
+
+  markOpeningDone(instructions = '') {
+    const base = String(instructions || this.sessionInstructions || '').trim()
+    const openingLock = (
+      'OPENING ALREADY DONE: The client already said hello and asked for the child\'s name aloud. '
+      + 'Do NOT greet again. Do NOT ask their name. Stay silent until they answer. '
+      + 'When they say a name, call set_child_name, greet them by name once, '
+      + 'then begin today\'s curriculum target with one short invite — '
+      + 'sound first if establishing, then syllables, then picture words, then phrases/sentences. '
+      + 'If they dislike a picture (for example “I don’t like snakes”) and ask for another animal '
+      + 'or a different topic, call switch_topic and move on warmly.'
+    )
+    return this.#send({
+      type: 'session.update',
+      session: {
+        instructions: base ? `${base}\n\n${openingLock}` : openingLock,
+      },
+    })
   }
 
   async speak(text) {
